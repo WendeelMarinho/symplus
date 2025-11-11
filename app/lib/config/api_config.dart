@@ -11,6 +11,10 @@ class ApiConfig {
   // - Dispositivo físico: configure via --dart-define API_BASE_URL=http://SEU_IP:8000
   //
   // Para produção: https://api.symplus.dev
+  // Para VPS: https://srv1113923.hstgr.cloud
+  //
+  // Exemplo de uso com VPS:
+  // flutter run -d chrome --dart-define=API_BASE_URL=https://srv1113923.hstgr.cloud
   static String get baseUrl {
     // Se definido via --dart-define, usa esse valor (prioridade máxima)
     const envUrl = String.fromEnvironment('API_BASE_URL', defaultValue: '');

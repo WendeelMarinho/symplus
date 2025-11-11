@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
+import 'package:flutter/foundation.dart';
 import '../../config/api_config.dart';
 import '../storage/storage_service.dart';
 
@@ -21,6 +22,11 @@ class DioClient {
           ApiConfig.contentTypeHeader: 'application/json',
           ApiConfig.acceptHeader: 'application/json',
         },
+        // Configuração específica para web
+        followRedirects: true,
+        validateStatus: (status) {
+          return status != null && status < 500;
+        },
       ),
     );
 
@@ -28,6 +34,11 @@ class DioClient {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          // Log da URL em debug (apenas para diagnóstico)
+          if (kDebugMode) {
+            debugPrint('🌐 Dio Request: ${options.method} ${options.baseUrl}${options.path}');
+          }
+
           // Adicionar token de autenticação
           final token = await StorageService.getToken();
           if (token != null) {
@@ -43,6 +54,14 @@ class DioClient {
           return handler.next(options);
         },
         onError: (error, handler) {
+          // Log detalhado de erros em debug
+          if (kDebugMode) {
+            debugPrint('❌ Dio Error: ${error.type}');
+            debugPrint('   Message: ${error.message}');
+            debugPrint('   Response: ${error.response?.statusCode}');
+            debugPrint('   URL: ${error.requestOptions.baseUrl}${error.requestOptions.path}');
+          }
+
           // Tratar erros 401 (não autenticado)
           if (error.response?.statusCode == 401) {
             // Limpar storage e redirecionar para login

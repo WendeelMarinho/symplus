@@ -79,18 +79,28 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       setState(() {
         String message;
         
-        // Erros de conexão/rede
+        // Log detalhado do erro para debug
+        debugPrint('🔴 Login Error Type: ${e.type}');
+        debugPrint('🔴 Login Error Message: ${e.message}');
+        debugPrint('🔴 Login Error Response: ${e.response?.statusCode}');
+        debugPrint('🔴 Login Error Data: ${e.response?.data}');
+        debugPrint('🔴 API Base URL: ${ApiConfig.baseUrl}');
+        
+        // Erros de conexão/rede (incluindo CORS)
         if (e.type == DioExceptionType.connectionError || 
             e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.unknown ||
             e.message?.contains('XMLHttpRequest') == true ||
-            e.message?.contains('connection error') == true) {
+            e.message?.contains('connection error') == true ||
+            e.message?.contains('CORS') == true ||
+            e.message?.contains('Failed to load') == true ||
+            e.message?.contains('NetworkError') == true) {
           message = 'Não foi possível conectar ao servidor.\n\n'
-              'Verifique se o backend está rodando:\n'
-              '1. cd backend\n'
-              '2. make up (ou docker compose up -d)\n'
-              '3. make migrate\n'
-              '4. make seed\n\n'
-              'URL esperada: ${ApiConfig.baseUrl}';
+              'Verifique:\n'
+              '1. Se o servidor está acessível: ${ApiConfig.baseUrl}\n'
+              '2. Se há problemas de CORS (verifique o console do navegador)\n'
+              '3. Se o certificado SSL é válido\n\n'
+              'URL configurada: ${ApiConfig.baseUrl}';
         }
         // Erros de timeout
         else if (e.type == DioExceptionType.receiveTimeout ||

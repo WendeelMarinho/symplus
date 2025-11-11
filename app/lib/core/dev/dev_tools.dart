@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/foundation.dart';
 import '../auth/auth_provider.dart';
 import '../navigation/menu_catalog.dart';
 import '../widgets/info_dialog.dart';
+import 'api_diagnostics.dart';
 
 /// Ferramentas de desenvolvimento para facilitar testes de QA
 /// 
@@ -92,6 +94,43 @@ ${menuItems.map((e) => '  • ${e.label}').join('\n')}
     if (width < 1000) return 'Tablet';
     return 'Desktop';
   }
+
+  /// Testa a conexão com a API e mostra um relatório
+  static Future<void> testApiConnection(BuildContext context) async {
+    // Mostrar loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    try {
+      final results = await ApiDiagnostics.runDiagnostics();
+      final report = ApiDiagnostics.formatReport(results);
+
+      if (context.mounted) {
+        Navigator.of(context).pop(); // Fechar loading
+        await InfoDialog.show(
+          context,
+          title: 'Diagnóstico da API',
+          icon: Icons.network_check,
+          message: report,
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.of(context).pop(); // Fechar loading
+        await InfoDialog.show(
+          context,
+          title: 'Erro no Diagnóstico',
+          icon: Icons.error,
+          message: 'Erro ao executar diagnóstico: $e',
+        );
+      }
+    }
+  }
 }
 
 /// Widget que adiciona botões de dev tools no AppBar (apenas em debug)
@@ -133,6 +172,20 @@ class DevToolsButton extends ConsumerWidget {
           onTap: () {
             Future.delayed(const Duration(milliseconds: 100), () {
               DevTools.showDebugInfo(context, ref);
+            });
+          },
+        ),
+        PopupMenuItem(
+          child: const Row(
+            children: [
+              Icon(Icons.network_check, size: 20),
+              SizedBox(width: 8),
+              Text('Testar API'),
+            ],
+          ),
+          onTap: () {
+            Future.delayed(const Duration(milliseconds: 100), () {
+              DevTools.testApiConnection(context);
             });
           },
         ),
