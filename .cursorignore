@@ -1,0 +1,39 @@
+# Dependencies
+**/node_modules/
+**/vendor/
+**/.dart_tool/
+**/build/
+**/.pub/
+
+# Environment files (removido - usar .gitignore)
+# .env
+# .env.local
+# .env.*.local
+# backend/.env
+# app/.env
+
+# Logs
+**/*.log
+backend/storage/logs/
+backend/storage/framework/
+
+# Cache
+**/.cache/
+backend/bootstrap/cache/
+backend/storage/framework/cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+
