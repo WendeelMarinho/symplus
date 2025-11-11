@@ -18,6 +18,13 @@ class CorsMiddleware
         // Get origin from request
         $origin = $request->header('Origin');
         
+        // Debug: log para verificar se middleware está sendo executado
+        \Log::debug('CorsMiddleware executed', [
+            'origin' => $origin,
+            'method' => $request->getMethod(),
+            'path' => $request->path(),
+        ]);
+        
         // Lista de origens permitidas (desenvolvimento e produção)
         $allowedOrigins = [
             'http://localhost',
