@@ -1,0 +1,117 @@
+services:
+  php:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: symplus_php_prod
+    restart: always
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+      - ./storage:/var/www/html/storage
+    networks:
+      - symplus_network
+    depends_on:
+      - db
+      - redis
+    environment:
+      - PHP_OPCACHE_VALIDATE_TIMESTAMPS=0
+      - PHP_OPCACHE_ENABLE=1
+      - APP_ENV=production
+    # Não expor porta PHP-FPM diretamente (usar Nginx)
+
+  nginx:
+    image: nginx:alpine
+    container_name: symplus_nginx_prod
+    restart: always
+    ports:
+      - "127.0.0.1:8000:80"  # Apenas localhost (Nginx externo faz proxy)
+    volumes:
+      - ./:/var/www/html
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - symplus_network
+    depends_on:
+      - php
+
+  db:
+    image: mysql:8.0.36
+    container_name: symplus_mysql_prod
+    restart: always
+    # Não expor porta MySQL diretamente (segurança)
+    # ports:
+    #   - "3306:3306"
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-symplus}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-root}
+      MYSQL_USER: ${DB_USERNAME:-symplus}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - symplus_network
+    command: --default-authentication-plugin=mysql_native_password
+
+  redis:
+    image: redis:7-alpine
+    container_name: symplus_redis_prod
+    restart: always
+    # Não expor porta Redis diretamente
+    # ports:
+    #   - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - symplus_network
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+
+  minio:
+    image: minio/minio:latest
+    container_name: symplus_minio_prod
+    restart: always
+    # Não expor portas MinIO diretamente (usar Nginx proxy se necessário)
+    # ports:
+    #   - "9000:9000"
+    #   - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - minio_data:/data
+    networks:
+      - symplus_network
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  createbucket:
+    image: minio/mc:latest
+    container_name: symplus_createbucket_prod
+    depends_on:
+      - minio
+    networks:
+      - symplus_network
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5;
+      /usr/bin/mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin};
+      /usr/bin/mc mb myminio/${AWS_BUCKET:-symplus} --ignore-existing;
+      /usr/bin/mc anonymous set download myminio/${AWS_BUCKET:-symplus};
+      exit 0;
+      "
+
+networks:
+  symplus_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+

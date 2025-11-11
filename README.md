@@ -369,6 +369,25 @@ Para questões e suporte:
 - Consulte a documentação em `docs/`
 - Veja a collection do Postman em `backend/postman/`
 
+## 🚀 Deploy em Produção
+
+Para fazer deploy da aplicação em uma VPS, consulte os guias completos:
+
+- **[Guia Completo de Deploy em VPS](docs/DEPLOY_VPS.md)** - Guia detalhado passo a passo
+- **[Guia Rápido de Deploy](docs/DEPLOY_QUICK_START.md)** - Resumo rápido para deploy
+- **[Setup Específico para VPS](docs/VPS_SPECIFIC_SETUP.md)** - Guia personalizado com informações do seu VPS
+- **[Deploy do App Flutter](app/docs/PRODUCTION_DEPLOY.md)** - Build e deploy do app mobile/web
+
+### Scripts de Deploy
+
+Scripts automatizados disponíveis em `scripts/`:
+
+- `deploy.sh` - Deploy automático (atualiza código, dependências, migrations)
+- `backup.sh` - Backup completo (banco, storage, MinIO)
+- `restore.sh` - Restauração de backup
+
+Veja [scripts/README.md](scripts/README.md) para mais detalhes.
+
 ## 🗺️ Roadmap
 
 - [ ] Exportação de relatórios (PDF/Excel)
