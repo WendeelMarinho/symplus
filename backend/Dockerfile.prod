@@ -1,3 +1,14 @@
+# Dockerfile.prod — Serviço PHP-FPM para Produção
+#
+# Mudanças aplicadas:
+# - Removido USER www-data fixo (agora usa UID/GID dinâmico via docker-compose)
+# - Working directory ajustado para /var/www/symplus/backend
+# - Entrypoint adicionado para gerenciar permissões automaticamente
+# - ACL não instalado no container (aplicado via serviço fixperm se necessário)
+#
+# O container roda com o UID/GID do host (definido em docker-compose.prod.yml)
+# para evitar conflitos de permissões entre host e container.
+
 FROM php:8.3-fpm
 
 # Instalar dependências do sistema
@@ -10,7 +21,9 @@ RUN apt-get update && apt-get install -y \
     zip \
     unzip \
     libzip-dev \
-    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip opcache \
+    libpq-dev \
+    libicu-dev \
+    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip opcache intl \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Instalar Composer
@@ -19,19 +32,16 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Instalar Redis extension
 RUN pecl install redis && docker-php-ext-enable redis
 
-# Criar usuário www-data
+# Criar usuário www-data (pode ser usado se necessário, mas não é o padrão)
 RUN groupadd -g 1000 www-data 2>/dev/null || true \
     && useradd -u 1000 -g www-data -m -s /bin/bash www-data 2>/dev/null || true
 
 # Definir diretório de trabalho
-WORKDIR /var/www/html
+WORKDIR /var/www/symplus/backend
 
-# Copiar arquivos da aplicação
-COPY --chown=www-data:www-data . /var/www/html
-
-# Configurar permissões
-RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 755 /var/www/html/storage /var/www/html/bootstrap/cache
+# Copiar entrypoint
+COPY docker/php/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Configurar OPcache para produção
 RUN echo "opcache.enable=1" >> /usr/local/etc/php/conf.d/opcache.ini \
@@ -49,12 +59,11 @@ RUN echo "memory_limit=512M" >> /usr/local/etc/php/conf.d/production.ini \
     && echo "max_execution_time=300" >> /usr/local/etc/php/conf.d/production.ini \
     && echo "max_input_time=300" >> /usr/local/etc/php/conf.d/production.ini
 
-# Mudar para usuário www-data
-USER www-data
+# NOTA: Não definimos USER aqui - o docker-compose.prod.yml define via user: "${HOST_UID}:${HOST_GID}"
+# Isso permite que o container rode com o mesmo UID/GID do host, evitando problemas de permissão.
 
 # Expor porta do PHP-FPM
 EXPOSE 9000
 
-# Comando padrão
-CMD ["php-fpm"]
-
+# Entrypoint será executado antes do CMD
+# O entrypoint.sh prepara diretórios e permissões, depois executa o comando passado
