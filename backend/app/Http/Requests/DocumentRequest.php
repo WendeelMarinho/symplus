@@ -1,0 +1,48 @@
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rules\File;
+
+class DocumentRequest extends FormRequest
+{
+    /**
+     * Determine if the user is authorized to make this request.
+     */
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Get the validation rules that apply to the request.
+     *
+     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     */
+    public function rules(): array
+    {
+        if ($this->isMethod('post')) {
+            // Upload
+            return [
+                'file' => [
+                    'required',
+                    'file',
+                    'max:10240', // 10MB
+                    File::types(['pdf', 'jpg', 'jpeg', 'png', 'gif', 'doc', 'docx', 'xls', 'xlsx']),
+                ],
+                'description' => ['nullable', 'string', 'max:1000'],
+                'category' => ['nullable', 'string', 'in:invoice,receipt,contract,other'],
+                'documentable_type' => ['nullable', 'string'],
+                'documentable_id' => ['nullable', 'integer'],
+            ];
+        }
+
+        // Update
+        return [
+            'name' => ['sometimes', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:1000'],
+            'category' => ['nullable', 'string', 'in:invoice,receipt,contract,other'],
+        ];
+    }
+}
