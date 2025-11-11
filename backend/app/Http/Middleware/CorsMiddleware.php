@@ -27,7 +27,7 @@ class CorsMiddleware
         ];
         
         // Permitir qualquer porta do localhost (para desenvolvimento Flutter Web)
-        $allowedOrigin = '*';
+        $allowedOrigin = null;
         if ($origin) {
             // Verificar se a origem está na lista permitida ou é localhost em qualquer porta
             foreach ($allowedOrigins as $allowed) {
@@ -37,7 +37,7 @@ class CorsMiddleware
                 }
             }
             // Se não encontrou, mas é localhost ou 127.0.0.1, permitir
-            if ($allowedOrigin === '*' && (
+            if (!$allowedOrigin && (
                 str_starts_with($origin, 'http://localhost:') ||
                 str_starts_with($origin, 'http://127.0.0.1:') ||
                 str_starts_with($origin, 'https://localhost:') ||
@@ -45,6 +45,11 @@ class CorsMiddleware
             )) {
                 $allowedOrigin = $origin;
             }
+        }
+        
+        // Se não encontrou origem permitida, usar wildcard (não recomendado em produção)
+        if (!$allowedOrigin) {
+            $allowedOrigin = '*';
         }
 
         // Handle preflight OPTIONS requests
