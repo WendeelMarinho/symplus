@@ -51,11 +51,21 @@ class CorsMiddleware
                 str_starts_with($origin, 'https://127.0.0.1:')
             )) {
                 $allowedOrigin = $origin;
+                \Log::debug('CorsMiddleware: Allowed localhost origin', ['origin' => $origin, 'allowed' => $allowedOrigin]);
             }
         }
         
-        // Se não encontrou origem permitida, usar wildcard (não recomendado em produção)
-        if (!$allowedOrigin) {
+        // Se não encontrou origem permitida, verificar se é localhost (desenvolvimento)
+        if (!$allowedOrigin && $origin) {
+            // Permitir qualquer localhost em desenvolvimento
+            if (str_contains($origin, 'localhost') || str_contains($origin, '127.0.0.1')) {
+                $allowedOrigin = $origin;
+                \Log::debug('CorsMiddleware: Allowed localhost fallback', ['origin' => $origin]);
+            } else {
+                // Em produção, usar wildcard apenas se necessário
+                $allowedOrigin = '*';
+            }
+        } elseif (!$allowedOrigin) {
             $allowedOrigin = '*';
         }
 
