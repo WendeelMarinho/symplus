@@ -73,7 +73,12 @@ class CorsMiddleware
         // Process the request
         $response = $next($request);
 
-        // Add CORS headers to all responses
+        // Add CORS headers to all responses (sobrescrever qualquer header anterior)
+        $response->headers->remove('Access-Control-Allow-Origin');
+        $response->headers->remove('Access-Control-Allow-Methods');
+        $response->headers->remove('Access-Control-Allow-Headers');
+        $response->headers->remove('Access-Control-Allow-Credentials');
+        
         $response->headers->set('Access-Control-Allow-Origin', $allowedOrigin);
         $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
         $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Organization-Id, Accept, X-Requested-With');
