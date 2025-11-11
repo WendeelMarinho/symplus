@@ -1,45 +1,33 @@
-# Dockerfile.prod — Serviço PHP-FPM para Produção
-#
-# Mudanças aplicadas:
-# - Removido USER www-data fixo (agora usa UID/GID dinâmico via docker-compose)
-# - Working directory ajustado para /var/www/symplus/backend
-# - Entrypoint adicionado para gerenciar permissões automaticamente
-# - ACL não instalado no container (aplicado via serviço fixperm se necessário)
-#
-# O container roda com o UID/GID do host (definido em docker-compose.prod.yml)
-# para evitar conflitos de permissões entre host e container.
-
 FROM php:8.3-fpm
 
-# Instalar dependências do sistema
+# Dependências básicas
 RUN apt-get update && apt-get install -y \
-    git \
-    curl \
-    libpng-dev \
-    libonig-dev \
-    libxml2-dev \
-    zip \
-    unzip \
-    libzip-dev \
-    libpq-dev \
-    libicu-dev \
-    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip opcache intl \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    git curl libpng-dev libonig-dev libxml2-dev zip unzip \
+    libzip-dev libpq-dev libicu-dev \
+ && rm -rf /var/lib/apt/lists/*
 
-# Instalar Composer
+# Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Instalar Redis extension
+# Extensões
 RUN pecl install redis && docker-php-ext-enable redis
+RUN docker-php-ext-install pdo pdo_mysql mbstring exif pcntl bcmath gd zip opcache intl
 
-# Criar usuário www-data (pode ser usado se necessário, mas não é o padrão)
+# Usuário base (compose definirá UID/GID em runtime)
 RUN groupadd -g 1000 www-data 2>/dev/null || true \
-    && useradd -u 1000 -g www-data -m -s /bin/bash www-data 2>/dev/null || true
+ && useradd  -u 1000 -g www-data -m www-data 2>/dev/null || true
 
-# Definir diretório de trabalho
-WORKDIR /var/www/symplus/backend
+WORKDIR /var/www/html
 
-# Copiar entrypoint
+# Copiar o código Laravel (context é backend/, então copiamos tudo)
+COPY --chown=www-data:www-data . ./
+
+# Garantir diretórios no build (caso não versionados)
+RUN mkdir -p storage bootstrap/cache \
+ && chown -R www-data:www-data /var/www/html \
+ && chmod -R 755 storage bootstrap/cache
+
+# Entrypoint para gerenciar permissões em runtime
 COPY docker/php/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
