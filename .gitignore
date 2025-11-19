@@ -50,35 +50,15 @@ backend/storage/framework/views/*
 backend/bootstrap/cache/*.php
 !backend/bootstrap/cache/.gitignore
 
-# Flutter
+# Flutter (cache de build e ferramentas)
 app/.dart_tool/
 app/.flutter-plugins
 app/.flutter-plugins-dependencies
 app/.packages
 app/.pub-cache/
 app/.pub/
-app/build/
 app/.flutter/
-app/**/GeneratedPluginRegistrant.dart
-app/ios/.symlinks/
-app/ios/Pods/
-app/ios/.generated/
-app/ios/Flutter/Flutter.framework
-app/ios/Flutter/Flutter.podspec
-app/ios/ServiceDefinitions.json
-app/ios/Runner/GeneratedPluginRegistrant.*
-app/android/.gradle
-app/android/app/debug
-app/android/app/profile
-app/android/app/release
-app/android/.idea
-app/android/local.properties
-app/android/**/GeneratedPluginRegistrant.java
-app/android/**/GeneratedPluginRegistrant.kt
-*.iml
-*.ipr
-*.iws
-.idea/
+
 
 # Node
 node_modules/
