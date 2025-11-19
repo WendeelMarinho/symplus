@@ -161,3 +161,4 @@ docker compose -f docker-compose.prod.yml restart nginx
 
 **Ordem:** Migration → Build → Commit → Push → Deploy no servidor
 
+# touch deploy Wed Nov 19 05:08:22 -03 2025
