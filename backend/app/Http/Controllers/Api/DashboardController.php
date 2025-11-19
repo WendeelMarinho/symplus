@@ -16,20 +16,32 @@ class DashboardController extends Controller
 {
     /**
      * Get aggregated dashboard data.
+     * 
+     * Query parameters:
+     * - from: Start date (Y-m-d format, optional, defaults to start of current month)
+     * - to: End date (Y-m-d format, optional, defaults to end of current month)
      */
     public function index(Request $request): JsonResponse
     {
         $organizationId = $request->header('X-Organization-Id');
         $organization = Organization::findOrFail($organizationId);
 
+        // Parse date filters from query parameters
+        $from = $request->input('from') 
+            ? \Carbon\Carbon::parse($request->input('from'))->startOfDay()
+            : now()->startOfMonth();
+        $to = $request->input('to')
+            ? \Carbon\Carbon::parse($request->input('to'))->endOfDay()
+            : now()->endOfMonth();
+
         $data = [
-            'financial_summary' => $this->getFinancialSummary($organizationId),
-            'recent_transactions' => $this->getRecentTransactions($organizationId),
+            'financial_summary' => $this->getFinancialSummary($organizationId, $from, $to),
+            'recent_transactions' => $this->getRecentTransactions($organizationId, $from, $to),
             'upcoming_due_items' => $this->getUpcomingDueItems($organizationId),
             'overdue_items' => $this->getOverdueItems($organizationId),
             'account_balances' => $this->getAccountBalances($organizationId),
-            'monthly_income_expense' => $this->getMonthlyIncomeExpense($organizationId),
-            'top_categories' => $this->getTopCategories($organizationId),
+            'monthly_income_expense' => $this->getMonthlyIncomeExpense($organizationId, $from, $to),
+            'top_categories' => $this->getTopCategories($organizationId, $from, $to),
             'cash_flow_projection' => $this->getCashFlowProjection($organizationId),
         ];
 
@@ -39,10 +51,10 @@ class DashboardController extends Controller
     /**
      * Get financial summary (total income, expenses, net).
      */
-    protected function getFinancialSummary(int $organizationId): array
+    protected function getFinancialSummary(int $organizationId, $from = null, $to = null): array
     {
-        $from = now()->startOfMonth();
-        $to = now()->endOfMonth();
+        $from = $from ?? now()->startOfMonth();
+        $to = $to ?? now()->endOfMonth();
 
         $income = Transaction::where('organization_id', $organizationId)
             ->where('type', 'income')
@@ -68,12 +80,18 @@ class DashboardController extends Controller
     }
 
     /**
-     * Get recent transactions (last 10).
+     * Get recent transactions (last 10, filtered by period if provided).
      */
-    protected function getRecentTransactions(int $organizationId): array
+    protected function getRecentTransactions(int $organizationId, $from = null, $to = null): array
     {
-        $transactions = Transaction::where('organization_id', $organizationId)
-            ->with(['account', 'category'])
+        $query = Transaction::where('organization_id', $organizationId)
+            ->with(['account', 'category']);
+        
+        if ($from && $to) {
+            $query->whereBetween('occurred_at', [$from, $to]);
+        }
+        
+        $transactions = $query
             ->orderBy('occurred_at', 'desc')
             ->orderBy('created_at', 'desc')
             ->limit(10)
@@ -168,9 +186,9 @@ class DashboardController extends Controller
     }
 
     /**
-     * Get monthly income and expense for the last 6 months.
+     * Get monthly income and expense for the period (or last 6 months if not specified).
      */
-    protected function getMonthlyIncomeExpense(int $organizationId): array
+    protected function getMonthlyIncomeExpense(int $organizationId, $from = null, $to = null): array
     {
         $driver = DB::connection()->getDriverName();
         $dateFormat = match ($driver) {
@@ -179,14 +197,29 @@ class DashboardController extends Controller
             default => "to_char(occurred_at, 'YYYY-MM')", // PostgreSQL
         };
 
-        $months = [];
-        for ($i = 5; $i >= 0; --$i) {
-            $month = now()->subMonths($i);
-            $months[] = $month->format('Y-m');
+        // If period is specified, use it; otherwise use last 6 months
+        if ($from && $to) {
+            $periodStart = $from->copy()->startOfMonth();
+            $periodEnd = $to->copy()->endOfMonth();
+            $months = [];
+            $current = $periodStart->copy();
+            while ($current->lte($periodEnd)) {
+                $months[] = $current->format('Y-m');
+                $current->addMonth();
+            }
+        } else {
+            $months = [];
+            for ($i = 5; $i >= 0; --$i) {
+                $month = now()->subMonths($i);
+                $months[] = $month->format('Y-m');
+            }
+            $periodStart = now()->subMonths(6)->startOfMonth();
+            $periodEnd = now()->endOfMonth();
         }
 
         $results = Transaction::where('organization_id', $organizationId)
-            ->where('occurred_at', '>=', now()->subMonths(6)->startOfMonth())
+            ->where('occurred_at', '>=', $periodStart)
+            ->where('occurred_at', '<=', $periodEnd)
             ->selectRaw("
                 {$dateFormat} as month,
                 type,
@@ -220,17 +253,18 @@ class DashboardController extends Controller
     }
 
     /**
-     * Get top categories by amount (last 3 months).
+     * Get top categories by amount for the period (or last 3 months if not specified).
      */
-    protected function getTopCategories(int $organizationId, int $limit = 5): array
+    protected function getTopCategories(int $organizationId, $from = null, $to = null, int $limit = 5): array
     {
-        $from = now()->subMonths(3)->startOfMonth();
+        $from = $from ?? now()->subMonths(3)->startOfMonth();
+        $to = $to ?? now()->endOfMonth();
 
         // Usar raw query para evitar problemas com eager loading em agregações
         $topIncomeResults = DB::table('transactions')
             ->where('organization_id', $organizationId)
             ->where('type', 'income')
-            ->where('occurred_at', '>=', $from)
+            ->whereBetween('occurred_at', [$from, $to])
             ->whereNotNull('category_id')
             ->select('category_id', DB::raw('SUM(amount) as total'))
             ->groupBy('category_id')
@@ -241,7 +275,7 @@ class DashboardController extends Controller
         $topExpensesResults = DB::table('transactions')
             ->where('organization_id', $organizationId)
             ->where('type', 'expense')
-            ->where('occurred_at', '>=', $from)
+            ->whereBetween('occurred_at', [$from, $to])
             ->whereNotNull('category_id')
             ->select('category_id', DB::raw('SUM(amount) as total'))
             ->groupBy('category_id')

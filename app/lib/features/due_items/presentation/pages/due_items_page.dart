@@ -28,9 +28,9 @@ class _DueItemsPageState extends ConsumerState<DueItemsPage> {
   bool _isLoading = true;
   String? _error;
   String? _filterStatus;
-  String? _filterType;
-  DateTime? _filterFrom;
-  DateTime? _filterTo;
+  int? _filterAccountId;
+  int? _filterCategoryId;
+  DateTime _selectedMonth = DateTime.now();
   int _currentPage = 1;
   int _totalPages = 1;
   bool _hasMore = false;
@@ -63,13 +63,18 @@ class _DueItemsPageState extends ConsumerState<DueItemsPage> {
     }
 
     try {
+      // Calcular início e fim do mês selecionado
+      final monthStart = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
+      final monthEnd = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
+      
       final response = await DueItemService.list(
         status: _filterStatus,
-        type: _filterType,
-        from: _filterFrom?.toIso8601String().split('T')[0],
-        to: _filterTo?.toIso8601String().split('T')[0],
+        accountId: _filterAccountId,
+        categoryId: _filterCategoryId,
+        from: monthStart.toIso8601String().split('T')[0],
+        to: monthEnd.toIso8601String().split('T')[0],
         page: _currentPage,
-        perPage: 50, // Mais itens para mostrar todas as seções
+        perPage: 100, // Mais itens para o calendário
       );
 
       if (response.statusCode == 200) {
@@ -346,10 +351,17 @@ class _DueItemsPageState extends ConsumerState<DueItemsPage> {
     final pendingItems = _dueItems.where((item) => item.isPending && !item.isOverdue).toList();
     final paidItems = _dueItems.where((item) => item.isPaid).toList();
 
-    final hasFilters = _filterStatus != null ||
-        _filterType != null ||
-        _filterFrom != null ||
-        _filterTo != null;
+    // Calcular itens desta semana
+    final now = DateTime.now();
+    final weekStart = now.subtract(Duration(days: now.weekday - 1));
+    final weekEnd = weekStart.add(const Duration(days: 6));
+    final thisWeekItems = _dueItems.where((item) {
+      return item.dueDate.isAfter(weekStart.subtract(const Duration(days: 1))) &&
+          item.dueDate.isBefore(weekEnd.add(const Duration(days: 1)));
+    }).toList();
+    thisWeekItems.sort((a, b) => a.dueDate.compareTo(b.dueDate));
+
+    final hasFilters = _filterStatus != null || _filterAccountId != null || _filterCategoryId != null;
 
     return Column(
       children: [
@@ -364,9 +376,8 @@ class _DueItemsPageState extends ConsumerState<DueItemsPage> {
                 onPressed: () {
                   setState(() {
                     _filterStatus = null;
-                    _filterType = null;
-                    _filterFrom = null;
-                    _filterTo = null;
+                    _filterAccountId = null;
+                    _filterCategoryId = null;
                     _currentPage = 1;
                   });
                   _loadDueItems();
@@ -404,8 +415,8 @@ class _DueItemsPageState extends ConsumerState<DueItemsPage> {
           actions: [
             if (canEdit)
               ActionItem(
-                label: 'Novo Vencimento',
-                icon: Icons.add,
+                label: 'Adicionar',
+                icon: Icons.add_circle,
                 onPressed: _showCreateDialog,
                 type: ActionType.primary,
               ),
@@ -424,7 +435,7 @@ class _DueItemsPageState extends ConsumerState<DueItemsPage> {
                           icon: Icons.calendar_today,
                           title: 'Nenhum vencimento encontrado',
                           message: 'Cadastre pagamentos e recebimentos para acompanhar seus vencimentos.',
-                          actionLabel: 'Novo Vencimento',
+                          actionLabel: 'Adicionar',
                           onAction: canEdit ? _showCreateDialog : null,
                         )
                       : RefreshIndicator(
@@ -434,134 +445,38 @@ class _DueItemsPageState extends ConsumerState<DueItemsPage> {
                             });
                             return _loadDueItems();
                           },
-                          child: ListView.builder(
-                            itemCount: (overdueItems.isNotEmpty ? 1 : 0) +
-                                overdueItems.length +
-                                (pendingItems.isNotEmpty ? 1 : 0) +
-                                pendingItems.length +
-                                (paidItems.isNotEmpty ? 1 : 0) +
-                                paidItems.length +
-                                (_hasMore ? 1 : 0),
-                            itemBuilder: (context, index) {
-                              // Seção Overdue
-                              if (overdueItems.isNotEmpty && index == 0) {
-                                return Container(
-                                  color: Colors.red.withOpacity(0.1),
-                                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.warning,
-                                        color: Colors.red[700],
-                                        size: 20,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Atrasados (${overdueItems.length})',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.red[700],
-                                        ),
-                                      ),
-                                    ],
+                          child: SingleChildScrollView(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Calendário mensal
+                                _buildMonthlyCalendar(context, _dueItems),
+                                const SizedBox(height: 16),
+                                // Lista "Esta semana"
+                                if (thisWeekItems.isNotEmpty) ...[
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                                    child: Text(
+                                      'Esta semana',
+                                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                    ),
                                   ),
-                                );
-                              }
-
-                              int adjustedIndex = index;
-                              if (overdueItems.isNotEmpty) {
-                                adjustedIndex--;
-                                if (adjustedIndex < overdueItems.length) {
-                                  final item = overdueItems[adjustedIndex];
-                                  return _buildDueItemCard(item, canEdit, Colors.red);
-                                }
-                                adjustedIndex -= overdueItems.length;
-                              }
-
-                              // Seção Pending
-                              if (pendingItems.isNotEmpty && adjustedIndex == 0) {
-                                return Container(
-                                  color: Colors.orange.withOpacity(0.1),
-                                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.schedule,
-                                        color: Colors.orange[700],
-                                        size: 20,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Pendentes (${pendingItems.length})',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.orange[700],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }
-
-                              if (pendingItems.isNotEmpty) {
-                                adjustedIndex--;
-                                if (adjustedIndex < pendingItems.length) {
-                                  final item = pendingItems[adjustedIndex];
-                                  return _buildDueItemCard(item, canEdit, Colors.orange);
-                                }
-                                adjustedIndex -= pendingItems.length;
-                              }
-
-                              // Seção Paid
-                              if (paidItems.isNotEmpty && adjustedIndex == 0) {
-                                return Container(
-                                  color: Colors.green.withOpacity(0.1),
-                                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.check_circle,
-                                        color: Colors.green[700],
-                                        size: 20,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Pagas (${paidItems.length})',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.green[700],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }
-
-                              if (paidItems.isNotEmpty) {
-                                adjustedIndex--;
-                                if (adjustedIndex < paidItems.length) {
-                                  final item = paidItems[adjustedIndex];
-                                  return _buildDueItemCard(item, canEdit, Colors.green);
-                                }
-                                adjustedIndex -= paidItems.length;
-                              }
-
-                              // Load more
-                              return Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Center(
-                                  child: TextButton(
-                                    onPressed: () {
-                                      setState(() {
-                                        _currentPage++;
-                                      });
-                                      _loadDueItems(showLoading: false);
-                                    },
-                                    child: const Text('Carregar mais'),
-                                  ),
-                                ),
-                              );
-                            },
+                                  const SizedBox(height: 8),
+                                  ...thisWeekItems.map((item) => _buildDueItemCard(
+                                        item,
+                                        canEdit,
+                                        item.isOverdue || item.isOverdueStatus
+                                            ? Colors.red
+                                            : item.isPending
+                                                ? Colors.orange
+                                                : Colors.green,
+                                      )),
+                                  const SizedBox(height: 16),
+                                ],
+                              ],
+                            ),
                           ),
                         ),
         ),
@@ -569,62 +484,245 @@ class _DueItemsPageState extends ConsumerState<DueItemsPage> {
     );
   }
 
+  Widget _buildMonthlyCalendar(BuildContext context, List<DueItem> items) {
+    final firstDay = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
+    final lastDay = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
+    final firstWeekday = firstDay.weekday;
+    final daysInMonth = lastDay.day;
+
+    // Agrupar itens por data
+    final itemsByDate = <DateTime, List<DueItem>>{};
+    for (var item in items) {
+      final date = DateTime(item.dueDate.year, item.dueDate.month, item.dueDate.day);
+      itemsByDate.putIfAbsent(date, () => []).add(item);
+    }
+
+    return Card(
+      margin: const EdgeInsets.all(16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            // Header do calendário
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.chevron_left),
+                  onPressed: () {
+                    setState(() {
+                      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1);
+                      _currentPage = 1;
+                    });
+                    _loadDueItems();
+                  },
+                ),
+                Text(
+                  DateFormat('MMMM yyyy', 'pt_BR').format(_selectedMonth),
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.chevron_right),
+                  onPressed: () {
+                    setState(() {
+                      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1);
+                      _currentPage = 1;
+                    });
+                    _loadDueItems();
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Dias da semana
+            Row(
+              children: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+                  .map((day) => Expanded(
+                        child: Center(
+                          child: Text(
+                            day,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          ),
+                        ),
+                      ))
+                  .toList(),
+            ),
+            const SizedBox(height: 8),
+            // Grid de dias
+            ...List.generate(
+              (firstWeekday + daysInMonth + 6) ~/ 7,
+              (weekIndex) {
+                return Row(
+                  children: List.generate(7, (dayIndex) {
+                    final dayNumber = weekIndex * 7 + dayIndex - firstWeekday + 1;
+                    if (dayNumber < 1 || dayNumber > daysInMonth) {
+                      return const Expanded(child: SizedBox());
+                    }
+                    final date = DateTime(_selectedMonth.year, _selectedMonth.month, dayNumber);
+                    final dayItems = itemsByDate[date] ?? [];
+                    final hasOverdue = dayItems.any((item) => item.isOverdue || item.isOverdueStatus);
+                    final hasPending = dayItems.any((item) => item.isPending && !item.isOverdue);
+                    final hasPaid = dayItems.any((item) => item.isPaid);
+
+                    return Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(2),
+                        child: Container(
+                          height: 50,
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(8),
+                            color: date.day == DateTime.now().day &&
+                                    _selectedMonth.month == DateTime.now().month &&
+                                    _selectedMonth.year == DateTime.now().year
+                                ? Theme.of(context).colorScheme.primaryContainer
+                                : null,
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                '$dayNumber',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: date.day == DateTime.now().day &&
+                                          _selectedMonth.month == DateTime.now().month &&
+                                          _selectedMonth.year == DateTime.now().year
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  if (hasOverdue)
+                                    Container(
+                                      width: 6,
+                                      height: 6,
+                                      decoration: const BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  if (hasPending)
+                                    Container(
+                                      width: 6,
+                                      height: 6,
+                                      decoration: const BoxDecoration(
+                                        color: Colors.orange,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  if (hasPaid)
+                                    Container(
+                                      width: 6,
+                                      height: 6,
+                                      decoration: const BoxDecoration(
+                                        color: Colors.green,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildDueItemCard(DueItem item, bool canEdit, Color sectionColor) {
     final daysUntilDue = item.dueDate.difference(DateTime.now()).inDays;
     final isPastDue = daysUntilDue < 0;
 
-    return ListItemCard(
-      title: item.title,
-      subtitle:
-          '${item.isPay ? "A Pagar" : "A Receber"} • ${DateFormat('dd/MM/yyyy').format(item.dueDate)}${isPastDue ? " (${-daysUntilDue} dias atrasado)" : ""}',
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            _formatCurrency(item.amount, 'BRL'),
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: item.isPay ? Colors.red : Colors.green,
-            ),
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: sectionColor.withOpacity(0.2),
+          child: Icon(
+            item.isPay ? Icons.arrow_upward : Icons.arrow_downward,
+            color: sectionColor,
           ),
-          if (item.isOverdue || item.isOverdueStatus) ...[
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.red,
-                borderRadius: BorderRadius.circular(12),
+        ),
+        title: Text(
+          item.title,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
               ),
-              child: const Text(
-                'ATRASADO',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 8,
+              children: [
+                Chip(
+                  label: Text(
+                    item.isPay ? 'A Pagar' : 'A Receber',
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                  backgroundColor: item.isPay ? Colors.red.shade50 : Colors.green.shade50,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-              ),
+                Text(
+                  DateFormat('dd/MM/yyyy').format(item.dueDate),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                if (isPastDue)
+                  Chip(
+                    label: Text(
+                      '${-daysUntilDue} dias atrasado',
+                      style: const TextStyle(fontSize: 11, color: Colors.white),
+                    ),
+                    backgroundColor: Colors.red,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+              ],
             ),
           ],
-        ],
+        ),
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              _formatCurrency(item.amount, 'BRL'),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: item.isPay ? Colors.red : Colors.green,
+              ),
+            ),
+            if (canEdit && item.isPending)
+              TextButton.icon(
+                icon: const Icon(Icons.check_circle, size: 16),
+                label: const Text('Pago'),
+                onPressed: () => _markAsPaid(item),
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.green,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+          ],
+        ),
       ),
-      leadingIcon: item.isPay ? Icons.arrow_upward : Icons.arrow_downward,
-      leadingColor: item.isPay ? Colors.red : Colors.green,
-      onTap: null,
-      actions: [
-        if (canEdit && item.isPending)
-          IconButton(
-            icon: const Icon(Icons.check_circle, size: 20),
-            onPressed: () => _markAsPaid(item),
-            tooltip: 'Marcar como pago',
-            color: Colors.green,
-          ),
-        if (canEdit)
-          IconButton(
-            icon: const Icon(Icons.delete, size: 20),
-            onPressed: () => _deleteDueItem(item),
-            tooltip: 'Excluir',
-          ),
-      ],
     );
   }
 }

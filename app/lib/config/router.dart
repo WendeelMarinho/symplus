@@ -12,6 +12,8 @@ import '../features/auth/presentation/pages/login_page.dart';
 import '../features/auth/presentation/pages/splash_page.dart';
 import '../features/categories/presentation/pages/categories_page.dart';
 import '../features/dashboard/presentation/pages/dashboard_page.dart';
+import '../features/dashboard/presentation/pages/dashboard_details_page.dart';
+import '../features/custom_indicators/presentation/pages/custom_indicator_details_page.dart';
 import '../features/documents/presentation/pages/documents_page.dart';
 import '../features/due_items/presentation/pages/due_items_page.dart';
 import '../features/notifications/presentation/pages/notifications_page.dart';
@@ -22,6 +24,7 @@ import '../features/requests/presentation/pages/request_detail_page.dart';
 import '../features/settings/presentation/pages/settings_page.dart';
 import '../features/subscription/presentation/pages/subscription_page.dart';
 import '../features/transactions/presentation/pages/transactions_page.dart';
+import '../features/transactions/presentation/pages/transaction_detail_page.dart';
 import '../features/overview/presentation/pages/overview_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -119,6 +122,28 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
+        path: '/app/dashboard/details/:type',
+        name: 'dashboard-details',
+        builder: (context, state) {
+          final type = state.pathParameters['type'] ?? 'income';
+          return AppShell(
+            currentRoute: MenuCatalog.dashboard,
+            child: DashboardDetailsPage(type: type),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/app/custom-indicators/:id',
+        name: 'custom-indicator-details',
+        builder: (context, state) {
+          final id = int.parse(state.pathParameters['id']!);
+          return AppShell(
+            currentRoute: MenuCatalog.dashboard,
+            child: CustomIndicatorDetailsPage(indicatorId: id),
+          );
+        },
+      ),
+      GoRoute(
         path: '/app/accounts',
         name: 'accounts',
         builder: (context, state) {
@@ -146,6 +171,17 @@ final routerProvider = Provider<GoRouter>((ref) {
           return AppShell(
             currentRoute: MenuCatalog.transactions,
             child: const TransactionsPage(),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/app/transactions/:id',
+        name: 'transaction-detail',
+        builder: (context, state) {
+          final transactionId = int.parse(state.pathParameters['id']!);
+          return AppShell(
+            currentRoute: MenuCatalog.transactions,
+            child: TransactionDetailPage(transactionId: transactionId),
           );
         },
       ),

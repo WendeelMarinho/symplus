@@ -1,0 +1,121 @@
+# GitHub Actions - Deploy Automatizado para VPS
+#
+# Este workflow automatiza o deploy da aplicação Symplus Finance para VPS.
+# Dispara automaticamente em push na branch main ou manualmente via GitHub Actions.
+#
+# Secrets necessários no GitHub:
+#   - VPS_HOST: IP ou domínio da VPS
+#   - VPS_USER: Usuário SSH (ex: root)
+#   - VPS_SSH_KEY: Chave SSH privada para acesso à VPS
+
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:  # Permite execução manual
+
+jobs:
+  deploy:
+    name: Deploy to Production VPS
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Test SSH connection
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo 'SSH connection OK'"
+
+      - name: Deploy to VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PATH: /var/www/symplus
+          GIT_REPO: https://github.com/${{ github.repository }}.git
+          BRANCH: main
+          DOMAIN_HEALTHCHECK: https://srv1113923.hstgr.cloud/api/health
+        run: |
+          echo "🚀 Iniciando deploy para VPS..."
+          
+          # Enviar script de deploy para VPS
+          scp -o StrictHostKeyChecking=no scripts/vps_deploy.sh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/vps_deploy.sh
+          
+          # Executar deploy na VPS
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            set -e
+            export VPS_PATH="/var/www/symplus"
+            export GIT_REPO="https://github.com/${{ github.repository }}.git"
+            export BRANCH="main"
+            export DOMAIN_HEALTHCHECK="https://srv1113923.hstgr.cloud/api/health"
+            
+            chmod +x /tmp/vps_deploy.sh
+            bash /tmp/vps_deploy.sh
+            
+            # Limpar script temporário
+            rm -f /tmp/vps_deploy.sh
+          EOF
+
+      - name: Verify deployment
+        run: |
+          echo "✅ Verificando deploy..."
+          sleep 10
+          curl -f https://srv1113923.hstgr.cloud/api/health || exit 1
+          echo "✅ Deploy verificado com sucesso!"
+
+  # (Opcional) Build Flutter Web
+  build-flutter-web:
+    name: Build Flutter Web (Opcional)
+    runs-on: ubuntu-latest
+    if: false  # Desabilitado por padrão - ative se necessário
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+
+      - name: Install dependencies
+        run: |
+          cd app
+          flutter pub get
+
+      - name: Build web
+        run: |
+          cd app
+          flutter build web --release
+
+      - name: Deploy Flutter Web to VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          # Criar diretório de release no frontend
+          RELEASE_ID=$(date +%Y%m%d%H%M%S)
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "mkdir -p /var/www/symplus/frontend/releases/${RELEASE_ID}"
+          
+          # Enviar build
+          scp -r -o StrictHostKeyChecking=no app/build/web/* ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/symplus/frontend/releases/${RELEASE_ID}/
+          
+          # Atualizar symlink
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << EOF
+            ln -sfn /var/www/symplus/frontend/releases/${RELEASE_ID} /var/www/symplus/frontend/current
+            
+            # Limpar releases antigas (manter últimas 5)
+            cd /var/www/symplus/frontend/releases
+            ls -1t | tail -n +6 | xargs rm -rf || true
+          EOF
+

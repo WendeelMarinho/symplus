@@ -1,0 +1,247 @@
+{
+  "app": {
+    "title": "Symplus Finance",
+    "name": "Symplus Finance"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "close": "Close",
+    "confirm": "Confirm",
+    "yes": "Yes",
+    "no": "No",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "retry": "Retry",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "search": "Search",
+    "filter": "Filter",
+    "clear": "Clear",
+    "apply": "Apply",
+    "details": "Details",
+    "view_all": "View all",
+    "today": "Today",
+    "current": "Current"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "subtitle": "Overview of your finances",
+    "breadcrumbs_0": "Home",
+    "kpi": {
+      "income": "Income",
+      "expense": "Expense",
+      "net": "Result",
+      "percentage": "Percentage",
+      "previous_month": "Previous month",
+      "increase": "Increase",
+      "decrease": "Decrease",
+      "in_relation_to_previous": "compared to the previous period"
+    },
+    "quarterly_summary": {
+      "title": "Quarterly Summary",
+      "income": "Income",
+      "expense": "Expense",
+      "net": "Result",
+      "percentage": "Percentage"
+    },
+    "custom_indicators": {
+      "title": "Custom Indicators",
+      "create": "Create Indicator",
+      "create_first": "Create First Indicator",
+      "empty_title": "No custom indicators",
+      "empty_message": "Create indicators to group categories and track your expenses",
+      "categories": "Categories",
+      "total_expenses_percentage": "of total expenses"
+    },
+    "charts": {
+      "income_expense": "Income vs Expenses",
+      "income_by_category": "Income by Category",
+      "expense_by_category": "Expenses by Category",
+      "period": "Period"
+    },
+    "calendar": {
+      "title": "Calendar",
+      "previous_month": "Previous month",
+      "next_month": "Next month",
+      "no_events": "No events",
+      "items": "item",
+      "items_plural": "items",
+      "due_items": "due item",
+      "due_items_plural": "due items",
+      "transactions": "transaction",
+      "transactions_plural": "transactions",
+      "total": "Total"
+    },
+    "recent_transactions": {
+      "title": "Recent Transactions"
+    },
+    "upcoming_due_items": {
+      "title": "Upcoming Due Items"
+    },
+    "overdue_items": {
+      "title": "Overdue Items",
+      "count_singular": "overdue item",
+      "count_plural": "overdue items"
+    },
+    "account_balances": {
+      "title": "Account Balances"
+    }
+  },
+  "transactions": {
+    "title": "Transactions",
+    "new": "New Transaction",
+    "edit": "Edit Transaction",
+    "delete": "Delete Transaction",
+    "delete_confirm": "Are you sure you want to delete this transaction? This action cannot be undone.",
+    "type": "Type",
+    "type_required": "Type is required",
+    "income": "Income",
+    "expense": "Expense",
+    "account": "Account",
+    "account_required": "Account is required",
+    "all_accounts": "All Accounts",
+    "category": "Category",
+    "no_category": "No category",
+    "all_categories": "All Categories",
+    "description": "Description",
+    "description_required": "Description is required",
+    "amount": "Amount",
+    "amount_required": "Amount is required",
+    "amount_invalid": "Invalid amount",
+    "date": "Transaction Date",
+    "date_required": "Date is required",
+    "select_date": "Select a date",
+    "document": "Document",
+    "document_required": "(required)",
+    "select_file": "Select file (PNG, JPG, PDF)",
+    "change_file": "Change file",
+    "accepted_formats": "Accepted formats: PNG, JPG, PDF. Maximum size: 5MB",
+    "file_too_large": "File too large. Maximum: 5MB",
+    "file_required": "Please select a document",
+    "created_success": "Transaction created successfully!",
+    "updated_success": "Transaction updated successfully!",
+    "deleted_success": "Transaction deleted successfully!",
+    "create_error": "Error creating transaction",
+    "update_error": "Error updating transaction",
+    "delete_error": "Error deleting transaction",
+    "empty": "No transactions found",
+    "empty_filtered": "No transactions found for the selected filters",
+    "load_more": "Load more",
+    "detail": {
+      "title": "Transaction Details",
+      "breadcrumbs_0": "Transactions",
+      "breadcrumbs_1": "Details",
+      "category": "Category",
+      "account": "Account",
+      "date": "Date",
+      "description": "Description",
+      "last_update": "Last update",
+      "attachment": {
+        "title": "Attached Document",
+        "available": "Document available",
+        "open": "Open Document",
+        "not_found": "No document found"
+      }
+    }
+  },
+  "period_filter": {
+    "title": "Select period",
+    "this_week": "This week",
+    "this_month": "This month",
+    "last_month": "Last month",
+    "quarter": "Quarter",
+    "semester": "Semester",
+    "year": "Year",
+    "custom": "Custom"
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Customize the app experience",
+    "breadcrumbs_0": "Account",
+    "breadcrumbs_1": "Settings",
+    "appearance": {
+      "title": "Appearance",
+      "theme": "Theme",
+      "theme_description": "Choose the app theme",
+      "system": "System",
+      "light": "Light",
+      "dark": "Dark"
+    },
+    "language": {
+      "title": "Language and Localization",
+      "language": "Language",
+      "language_description": "Choose the app language",
+      "currency": "Default Currency",
+      "currency_description": "Currency used by default",
+      "currency_changed": "Currency changed to {currency}",
+      "currency_changed_brl": "Brazilian Real",
+      "currency_changed_usd": "US Dollar",
+      "pt_br": "Portuguese (Brazil)",
+      "en_us": "English (US)"
+    }
+  },
+  "calendar_day_modal": {
+    "transactions": "Transactions",
+    "due_items": "Due Items",
+    "total_income": "Total Income",
+    "total_expenses": "Total Expenses",
+    "total_due": "Total Due",
+    "net_result": "Net Result",
+    "view_all_transactions": "View all transactions",
+    "no_items": "No items found for this day"
+  },
+  "custom_indicator": {
+    "create": "Create New Indicator",
+    "edit": "Edit Indicator",
+    "name": "Indicator Name",
+    "name_required": "Name cannot be empty",
+    "categories": "Categories (Expenses)",
+    "select_categories": "Select categories",
+    "categories_selected": "{count} categories selected",
+    "categories_required": "Select at least one category",
+    "preview_sum": "Sum of selected categories (current period)",
+    "created_success": "Indicator created successfully",
+    "updated_success": "Indicator updated successfully",
+    "deleted_success": "Indicator deleted successfully",
+    "create_error": "Error creating indicator",
+    "update_error": "Error updating indicator",
+    "delete_error": "Error deleting indicator",
+    "delete_confirm": "Are you sure you want to delete the indicator \"{name}\"?",
+    "details": {
+      "title": "Custom indicator details",
+      "breadcrumbs_0": "Dashboard",
+      "breadcrumbs_1": "Indicators",
+      "breadcrumbs_2": "Details",
+      "total_value": "Total Value",
+      "expense_percentage": "Percentage of Expenses",
+      "associated_categories": "Associated Categories",
+      "related_transactions": "Related Transactions",
+      "empty": "No transactions found for this indicator in the current period."
+    }
+  },
+  "dashboard_details": {
+    "title_income": "Details - Income",
+    "title_expense": "Details - Expense",
+    "title_net": "Details - Result",
+    "title_percentage": "Details - Percentage",
+    "subtitle": "Transactions for the period",
+    "breadcrumbs_0": "Dashboard",
+    "breadcrumbs_1": "Details",
+    "empty": "No transactions found",
+    "empty_message": "There are no transactions of the selected type in the period."
+  },
+  "errors": {
+    "generic": "An error occurred",
+    "network": "Connection error",
+    "not_found": "Not found",
+    "unauthorized": "Unauthorized",
+    "forbidden": "Access denied"
+  }
+}
+

@@ -7,6 +7,8 @@ class DueItemService {
   static Future<Response> list({
     String? status,
     String? type,
+    int? accountId,
+    int? categoryId,
     String? from,
     String? to,
     int? page,
@@ -18,6 +20,12 @@ class DueItemService {
     }
     if (type != null) {
       queryParams['type'] = type;
+    }
+    if (accountId != null) {
+      queryParams['account_id'] = accountId;
+    }
+    if (categoryId != null) {
+      queryParams['category_id'] = categoryId;
     }
     if (from != null) {
       queryParams['from'] = from;

@@ -70,6 +70,7 @@ class _CategoriesPageState extends ConsumerState<CategoriesPage> {
     try {
       final response = await CategoryService.list(
         type: _filterType,
+        search: _searchController.text.isEmpty ? null : _searchController.text,
         page: _currentPage,
         perPage: 15,
       );
@@ -105,59 +106,156 @@ class _CategoriesPageState extends ConsumerState<CategoriesPage> {
     final typeController = TextEditingController(text: 'expense');
     final colorController = TextEditingController(text: '#3B82F6');
     final formKey = GlobalKey<FormState>();
+    final List<String> presetColors = [
+      '#3B82F6', // Blue
+      '#10B981', // Green
+      '#EF4444', // Red
+      '#F59E0B', // Amber
+      '#8B5CF6', // Purple
+      '#EC4899', // Pink
+      '#06B6D4', // Cyan
+      '#84CC16', // Lime
+    ];
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Nova Categoria'),
-        content: Form(
-          key: formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Nome da Categoria *',
-                    border: OutlineInputBorder(),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Nova Categoria'),
+          content: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Preview de cor/ícone
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: _parseColor(colorController.text).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _parseColor(colorController.text),
+                        width: 2,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 64,
+                          height: 64,
+                          decoration: BoxDecoration(
+                            color: _parseColor(colorController.text).withOpacity(0.2),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: _parseColor(colorController.text),
+                              width: 2,
+                            ),
+                          ),
+                          child: Icon(
+                            Icons.category,
+                            color: _parseColor(colorController.text),
+                            size: 36,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          nameController.text.isEmpty ? 'Preview' : nameController.text,
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                      ],
+                    ),
                   ),
-                  validator: (value) =>
-                      value?.isEmpty ?? true ? 'Nome é obrigatório' : null,
-                  autofocus: true,
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: typeController.text,
-                  decoration: const InputDecoration(
-                    labelText: 'Tipo *',
-                    border: OutlineInputBorder(),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Nome da Categoria *',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) =>
+                        value?.isEmpty ?? true ? 'Nome é obrigatório' : null,
+                    autofocus: true,
+                    onChanged: (_) => setDialogState(() {}),
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'income', child: Text('Receita')),
-                    DropdownMenuItem(value: 'expense', child: Text('Despesa')),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      typeController.text = value;
-                    }
-                  },
-                  validator: (value) =>
-                      value?.isEmpty ?? true ? 'Tipo é obrigatório' : null,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: colorController,
-                  decoration: const InputDecoration(
-                    labelText: 'Cor (hex)',
-                    border: OutlineInputBorder(),
-                    helperText: 'Ex: #3B82F6',
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    value: typeController.text,
+                    decoration: const InputDecoration(
+                      labelText: 'Tipo *',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'income', child: Text('Receita')),
+                      DropdownMenuItem(value: 'expense', child: Text('Despesa')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        typeController.text = value;
+                        setDialogState(() {});
+                      }
+                    },
+                    validator: (value) =>
+                        value?.isEmpty ?? true ? 'Tipo é obrigatório' : null,
                   ),
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  // Seletor de cores
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Cor',
+                        style: Theme.of(context).textTheme.labelMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: presetColors.map((color) {
+                          final isSelected = colorController.text == color;
+                          return GestureDetector(
+                            onTap: () {
+                              colorController.text = color;
+                              setDialogState(() {});
+                            },
+                            child: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: _parseColor(color),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isSelected
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Colors.transparent,
+                                  width: isSelected ? 3 : 0,
+                                ),
+                              ),
+                              child: isSelected
+                                  ? const Icon(Icons.check, color: Colors.white, size: 20)
+                                  : null,
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: colorController,
+                        decoration: const InputDecoration(
+                          labelText: 'Cor (hex)',
+                          border: OutlineInputBorder(),
+                          helperText: 'Ex: #3B82F6',
+                        ),
+                        onChanged: (_) => setDialogState(() {}),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
         actions: [
           TextButton(
             onPressed: () {
@@ -195,6 +293,7 @@ class _CategoriesPageState extends ConsumerState<CategoriesPage> {
           ),
         ],
       ),
+        ),
     );
   }
 
@@ -231,59 +330,156 @@ class _CategoriesPageState extends ConsumerState<CategoriesPage> {
     final typeController = TextEditingController(text: category.type);
     final colorController = TextEditingController(text: category.color);
     final formKey = GlobalKey<FormState>();
+    final List<String> presetColors = [
+      '#3B82F6', // Blue
+      '#10B981', // Green
+      '#EF4444', // Red
+      '#F59E0B', // Amber
+      '#8B5CF6', // Purple
+      '#EC4899', // Pink
+      '#06B6D4', // Cyan
+      '#84CC16', // Lime
+    ];
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Editar Categoria'),
-        content: Form(
-          key: formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Nome da Categoria *',
-                    border: OutlineInputBorder(),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Editar Categoria'),
+          content: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Preview de cor/ícone
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: _parseColor(colorController.text).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _parseColor(colorController.text),
+                        width: 2,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 64,
+                          height: 64,
+                          decoration: BoxDecoration(
+                            color: _parseColor(colorController.text).withOpacity(0.2),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: _parseColor(colorController.text),
+                              width: 2,
+                            ),
+                          ),
+                          child: Icon(
+                            Icons.category,
+                            color: _parseColor(colorController.text),
+                            size: 36,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          nameController.text,
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                      ],
+                    ),
                   ),
-                  validator: (value) =>
-                      value?.isEmpty ?? true ? 'Nome é obrigatório' : null,
-                  autofocus: true,
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: typeController.text,
-                  decoration: const InputDecoration(
-                    labelText: 'Tipo *',
-                    border: OutlineInputBorder(),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Nome da Categoria *',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) =>
+                        value?.isEmpty ?? true ? 'Nome é obrigatório' : null,
+                    autofocus: true,
+                    onChanged: (_) => setDialogState(() {}),
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'income', child: Text('Receita')),
-                    DropdownMenuItem(value: 'expense', child: Text('Despesa')),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      typeController.text = value;
-                    }
-                  },
-                  validator: (value) =>
-                      value?.isEmpty ?? true ? 'Tipo é obrigatório' : null,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: colorController,
-                  decoration: const InputDecoration(
-                    labelText: 'Cor (hex)',
-                    border: OutlineInputBorder(),
-                    helperText: 'Ex: #3B82F6',
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    value: typeController.text,
+                    decoration: const InputDecoration(
+                      labelText: 'Tipo *',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'income', child: Text('Receita')),
+                      DropdownMenuItem(value: 'expense', child: Text('Despesa')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        typeController.text = value;
+                        setDialogState(() {});
+                      }
+                    },
+                    validator: (value) =>
+                        value?.isEmpty ?? true ? 'Tipo é obrigatório' : null,
                   ),
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  // Seletor de cores
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Cor',
+                        style: Theme.of(context).textTheme.labelMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: presetColors.map((color) {
+                          final isSelected = colorController.text == color;
+                          return GestureDetector(
+                            onTap: () {
+                              colorController.text = color;
+                              setDialogState(() {});
+                            },
+                            child: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: _parseColor(color),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isSelected
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Colors.transparent,
+                                  width: isSelected ? 3 : 0,
+                                ),
+                              ),
+                              child: isSelected
+                                  ? const Icon(Icons.check, color: Colors.white, size: 20)
+                                  : null,
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: colorController,
+                        decoration: const InputDecoration(
+                          labelText: 'Cor (hex)',
+                          border: OutlineInputBorder(),
+                          helperText: 'Ex: #3B82F6',
+                        ),
+                        onChanged: (_) => setDialogState(() {}),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
         actions: [
           TextButton(
             onPressed: () {
@@ -321,6 +517,7 @@ class _CategoriesPageState extends ConsumerState<CategoriesPage> {
           ),
         ],
       ),
+        ),
     );
   }
 
@@ -396,6 +593,156 @@ class _CategoriesPageState extends ConsumerState<CategoriesPage> {
     }
   }
 
+  /// Grid de pills coloridas
+  Widget _buildCategoriesGrid(BuildContext context, bool canEdit, bool canDelete) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    final crossAxisCount = isMobile ? 2 : (MediaQuery.of(context).size.width < 900 ? 3 : 4);
+    
+    return GridView.builder(
+      padding: const EdgeInsets.all(16),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+        childAspectRatio: 1.2,
+      ),
+      itemCount: _categories.length + (_hasMore ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index == _categories.length) {
+          return Card(
+            child: Center(
+              child: TextButton(
+                onPressed: () {
+                  setState(() {
+                    _currentPage++;
+                  });
+                  _loadCategories(showLoading: false);
+                },
+                child: const Text('Carregar mais'),
+              ),
+            ),
+          );
+        }
+
+        final category = _categories[index];
+        final categoryColor = _parseColor(category.color);
+        
+        return Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: canEdit ? () => _showEditDialog(category) : null,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Ícone/Preview de cor
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: categoryColor.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: categoryColor,
+                        width: 2,
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.category,
+                      color: categoryColor,
+                      size: 32,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Nome
+                  Text(
+                    category.name,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  // Tipo e contagem
+                  Wrap(
+                    spacing: 4,
+                    children: [
+                      Chip(
+                        label: Text(
+                          category.isIncome ? 'Receita' : 'Despesa',
+                          style: const TextStyle(fontSize: 10),
+                        ),
+                        backgroundColor: category.isIncome
+                            ? Colors.green.shade50
+                            : Colors.red.shade50,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      if (category.transactionsCount != null && category.transactionsCount! > 0)
+                        Chip(
+                          label: Text(
+                            '${category.transactionsCount}',
+                            style: const TextStyle(fontSize: 10),
+                          ),
+                          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                    ],
+                  ),
+                  // Menu de ações
+                  if (canEdit || canDelete)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert, size: 18),
+                        onSelected: (value) {
+                          if (value == 'edit' && canEdit) {
+                            _showEditDialog(category);
+                          } else if (value == 'delete' && canDelete) {
+                            _deleteCategory(category);
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          if (canEdit)
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.edit, size: 20),
+                                  SizedBox(width: 8),
+                                  Text('Editar'),
+                                ],
+                              ),
+                            ),
+                          if (canDelete)
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.delete, size: 20, color: Colors.red),
+                                  SizedBox(width: 8),
+                                  Text('Excluir', style: TextStyle(color: Colors.red)),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
@@ -442,12 +789,49 @@ class _CategoriesPageState extends ConsumerState<CategoriesPage> {
             ),
           ],
         ),
+        // Barra de busca
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Buscar categorias...',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() {
+                          _currentPage = 1;
+                        });
+                        _loadCategories();
+                      },
+                    )
+                  : null,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onChanged: (value) {
+              // Debounce search
+              Future.delayed(const Duration(milliseconds: 500), () {
+                if (_searchController.text == value) {
+                  setState(() {
+                    _currentPage = 1;
+                  });
+                  _loadCategories();
+                }
+              });
+            },
+          ),
+        ),
         ActionBar(
           actions: [
             if (canCreate)
               ActionItem(
-                label: 'Nova Categoria',
-                icon: Icons.add,
+                label: 'Adicionar Categoria',
+                icon: Icons.add_circle,
                 onPressed: _showCreateDialog,
                 type: ActionType.primary,
               ),
@@ -465,62 +849,15 @@ class _CategoriesPageState extends ConsumerState<CategoriesPage> {
                       ? EmptyState(
                           icon: Icons.category,
                           title: 'Nenhuma categoria encontrada',
-                          message: _filterType != null
-                              ? 'Nenhuma categoria do tipo selecionado foi encontrada.'
+                          message: _filterType != null || (_searchController.text.isNotEmpty)
+                              ? 'Nenhuma categoria corresponde aos filtros aplicados.'
                               : 'Crie categorias para organizar suas receitas e despesas.',
                           actionLabel: 'Criar Categoria',
                           onAction: canCreate ? _showCreateDialog : null,
                         )
                       : RefreshIndicator(
                           onRefresh: _loadCategories,
-                          child: ListView.builder(
-                            itemCount: _categories.length + (_hasMore ? 1 : 0),
-                            itemBuilder: (context, index) {
-                              if (index == _categories.length) {
-                                // Load more button
-                                return Padding(
-                                  padding: const EdgeInsets.all(16.0),
-                                  child: Center(
-                                    child: TextButton(
-                                      onPressed: () {
-                                        setState(() {
-                                          _currentPage++;
-                                        });
-                                        _loadCategories(showLoading: false);
-                                      },
-                                      child: const Text('Carregar mais'),
-                                    ),
-                                  ),
-                                );
-                              }
-
-                              final category = _categories[index];
-                              return ListItemCard(
-                                title: category.name,
-                                subtitle: '${category.isIncome ? "Receita" : "Despesa"} • ${category.transactionsCount ?? 0} transações',
-                                leadingIcon: Icons.category,
-                                leadingColor: _parseColor(category.color),
-                                trailing: category.isIncome
-                                    ? const Icon(Icons.trending_up, color: Colors.green, size: 20)
-                                    : const Icon(Icons.trending_down, color: Colors.red, size: 20),
-                                onTap: null, // Categories don't have detail pages
-                                actions: [
-                                  if (canEdit)
-                                    IconButton(
-                                      icon: const Icon(Icons.edit, size: 20),
-                                      onPressed: () => _showEditDialog(category),
-                                      tooltip: 'Editar',
-                                    ),
-                                  if (canEdit)
-                                    IconButton(
-                                      icon: const Icon(Icons.delete, size: 20),
-                                      onPressed: () => _deleteCategory(category),
-                                      tooltip: 'Excluir',
-                                    ),
-                                ],
-                              );
-                            },
-                          ),
+                          child: _buildCategoriesGrid(context, canEdit, canDelete),
                         ),
         ),
       ],

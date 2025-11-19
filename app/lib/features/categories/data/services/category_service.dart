@@ -6,12 +6,16 @@ class CategoryService {
   /// Lista todas as categorias
   static Future<Response> list({
     String? type,
+    String? search,
     int? page,
     int? perPage,
   }) async {
     final queryParams = <String, dynamic>{};
     if (type != null) {
       queryParams['type'] = type;
+    }
+    if (search != null && search.isNotEmpty) {
+      queryParams['search'] = search;
     }
     if (page != null) {
       queryParams['page'] = page;

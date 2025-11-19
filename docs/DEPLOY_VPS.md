@@ -1,648 +1,580 @@
 # 🚀 Guia de Deploy em VPS - Symplus Finance
 
-Este guia completo explica como fazer o deploy da aplicação Symplus Finance em uma VPS (Virtual Private Server).
+Este guia descreve o processo completo de deploy da aplicação Symplus Finance em uma VPS usando estratégia de releases com zero-downtime.
 
 ## 📋 Índice
 
-1. [Pré-requisitos](#pré-requisitos)
-2. [Preparação da VPS](#preparação-da-vps)
-3. [Configuração do Backend](#configuração-do-backend)
-4. [Configuração do App Flutter](#configuração-do-app-flutter)
-5. [SSL/HTTPS com Let's Encrypt](#sslhttps-com-lets-encrypt)
-6. [Monitoramento e Manutenção](#monitoramento-e-manutenção)
-7. [Backup e Restauração](#backup-e-restauração)
-8. [Troubleshooting](#troubleshooting)
+- [Pré-requisitos](#pré-requisitos)
+- [Estrutura de Diretórios](#estrutura-de-diretórios)
+- [Preparação Inicial](#preparação-inicial)
+- [Deploy Automatizado](#deploy-automatizado)
+- [Deploy Manual](#deploy-manual)
+- [Rollback](#rollback)
+- [Troubleshooting](#troubleshooting)
+- [GitHub Actions (CI/CD)](#github-actions-cicd)
 
 ---
 
 ## 📦 Pré-requisitos
 
-### Requisitos da VPS
+### Na VPS (Ubuntu)
 
-- **Sistema Operacional**: Ubuntu 22.04 LTS (recomendado) ou 20.04 LTS
-- **RAM**: Mínimo 2GB (recomendado 4GB+)
-- **CPU**: Mínimo 2 cores
-- **Disco**: Mínimo 20GB SSD
-- **Rede**: IP público estático
+- **Docker** e **Docker Compose** instalados
+- **Git** instalado
+- **curl** instalado
+- Usuário com permissões sudo (ou root)
+- SSH key configurada para acesso ao GitHub (ou token)
+- Portas 80, 443, 8000 abertas no firewall
 
-### Software Necessário
-
-- Docker 24.0+ e Docker Compose 2.20+
-- Git
-- Certbot (para SSL)
-- Nginx (como proxy reverso)
-
-### Domínios
-
-- Domínio principal (ex: `symplus.dev`)
-- Subdomínio para API (ex: `api.symplus.dev`)
-- Subdomínio para app web (ex: `app.symplus.dev`)
-
----
-
-## 🖥️ Preparação da VPS
-
-### 1. Conectar na VPS
+### Verificar Instalação
 
 ```bash
-ssh root@seu-ip-vps
-# ou
-ssh usuario@seu-ip-vps
-```
-
-### 2. Atualizar o Sistema
-
-```bash
-sudo apt update && sudo apt upgrade -y
-```
-
-### 3. Instalar Docker e Docker Compose
-
-```bash
-# Instalar dependências
-sudo apt install -y apt-transport-https ca-certificates curl software-properties-common
-
-# Adicionar repositório Docker
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-# Instalar Docker
-sudo apt update
-sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-
-# Adicionar usuário ao grupo docker (se não for root)
-sudo usermod -aG docker $USER
-newgrp docker
-
-# Verificar instalação
+# Docker
 docker --version
 docker compose version
+
+# Git
+git --version
+
+# curl
+curl --version
 ```
 
-### 4. Instalar Nginx (Proxy Reverso)
+### Usuário e Permissões
 
+O deploy assume que você está rodando como usuário com UID/GID **1001:1001** (ou configure `HOST_UID`/`HOST_GID`).
+
+Verificar:
 ```bash
-sudo apt install -y nginx
-sudo systemctl enable nginx
-sudo systemctl start nginx
-```
-
-### 5. Instalar Certbot (SSL)
-
-```bash
-sudo apt install -y certbot python3-certbot-nginx
-```
-
-### 6. Configurar Firewall
-
-```bash
-# UFW (Ubuntu Firewall)
-sudo ufw allow OpenSSH
-sudo ufw allow 'Nginx Full'
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-sudo ufw enable
-```
-
-### 7. Criar Usuário para Aplicação (Opcional, mas recomendado)
-
-```bash
-sudo adduser symplus
-sudo usermod -aG docker symplus
-sudo mkdir -p /var/www/symplus
-sudo chown symplus:symplus /var/www/symplus
+id -u  # Deve retornar 1001 (ou seu UID)
+id -g  # Deve retornar 1001 (ou seu GID)
 ```
 
 ---
 
-## 🔧 Configuração do Backend
+## 📁 Estrutura de Diretórios
 
-### 1. Clonar o Repositório
+Após o primeiro deploy, a estrutura será:
 
-```bash
-cd /var/www
-sudo git clone https://github.com/WendeelMarinho/symplus.git symplus
-cd symplus/backend
+```
+/var/www/symplus/
+├── current -> releases/20251111120000/  # Symlink para release ativa
+├── releases/                             # Histórico de releases
+│   ├── 20251111120000/                   # Release 1
+│   ├── 20251111130000/                   # Release 2
+│   └── 20251111140000/                   # Release 3 (ativa)
+├── shared/                                # Dados persistentes
+│   └── backend/
+│       ├── .env                          # Configurações (NÃO commitado)
+│       └── storage/                      # Storage Laravel (persistente)
+└── scripts/                               # Scripts de deploy
+    ├── vps_deploy.sh
+    └── vps_rollback.sh
 ```
 
-### 2. Configurar Variáveis de Ambiente
+### Por que essa estrutura?
 
-```bash
-cp env.example .env
-nano .env
-```
-
-**Configurações importantes para produção:**
-
-```env
-APP_NAME=Symplus
-APP_ENV=production
-APP_KEY=  # Será gerado automaticamente
-APP_DEBUG=false
-APP_TIMEZONE=America/Sao_Paulo
-APP_URL=https://api.symplus.dev
-
-LOG_CHANNEL=stack
-LOG_LEVEL=error  # Em produção, use 'error' ou 'warning'
-
-DB_CONNECTION=mysql
-DB_HOST=db
-DB_PORT=3306
-DB_DATABASE=symplus_prod
-DB_USERNAME=symplus_user
-DB_PASSWORD=senha_forte_aqui  # Use uma senha forte!
-
-SESSION_DRIVER=redis
-QUEUE_CONNECTION=redis
-CACHE_STORE=redis
-
-REDIS_HOST=redis
-REDIS_PORT=6379
-
-# MinIO/S3
-AWS_ACCESS_KEY_ID=minioadmin_prod
-AWS_SECRET_ACCESS_KEY=senha_forte_minio
-AWS_BUCKET=symplus
-AWS_ENDPOINT=http://minio:9000
-
-# Stripe (configure suas chaves reais)
-STRIPE_KEY=pk_live_...
-STRIPE_SECRET=sk_live_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-
-# Email (configure seu servidor SMTP)
-MAIL_MAILER=smtp
-MAIL_HOST=smtp.gmail.com
-MAIL_PORT=587
-MAIL_USERNAME=seu-email@gmail.com
-MAIL_PASSWORD=sua-senha-app
-MAIL_ENCRYPTION=tls
-MAIL_FROM_ADDRESS=noreply@symplus.dev
-MAIL_FROM_NAME="Symplus Finance"
-```
-
-### 3. Usar Docker Compose de Produção
-
-```bash
-# Copiar arquivo de produção
-cp docker-compose.yml docker-compose.prod.yml
-# Ou use o arquivo docker-compose.prod.yml já configurado
-```
-
-### 4. Iniciar os Containers
-
-```bash
-docker compose -f docker-compose.prod.yml up -d
-```
-
-### 5. Instalar Dependências
-
-```bash
-docker compose -f docker-compose.prod.yml exec php composer install --optimize-autoloader --no-dev
-```
-
-### 6. Configurar Aplicação
-
-```bash
-# Gerar chave da aplicação
-docker compose -f docker-compose.prod.yml exec php php artisan key:generate
-
-# Executar migrations
-docker compose -f docker-compose.prod.yml exec php php artisan migrate --force
-
-# Criar link simbólico para storage
-docker compose -f docker-compose.prod.yml exec php php artisan storage:link
-
-# Limpar e otimizar cache
-docker compose -f docker-compose.prod.yml exec php php artisan config:cache
-docker compose -f docker-compose.prod.yml exec php php artisan route:cache
-docker compose -f docker-compose.prod.yml exec php php artisan view:cache
-```
-
-### 7. Configurar Laravel Horizon (Filas)
-
-```bash
-# Criar supervisor ou systemd service para Horizon
-# Veja seção de monitoramento abaixo
-```
+- **`releases/`**: Cada deploy cria uma nova pasta com timestamp
+- **`current/`**: Symlink apontando para release ativa (zero-downtime)
+- **`shared/`**: Dados que persistem entre deploys (.env, storage)
 
 ---
 
-## 🌐 Configuração do Nginx (Proxy Reverso)
+## 🔧 Preparação Inicial
 
-### 1. Criar Configuração para API
-
-```bash
-sudo nano /etc/nginx/sites-available/symplus-api
-```
-
-**Conteúdo:**
-
-```nginx
-server {
-    listen 80;
-    server_name api.symplus.dev;
-
-    # Redirecionar para HTTPS (será configurado após SSL)
-    return 301 https://$server_name$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name api.symplus.dev;
-
-    # Certificados SSL (serão gerados pelo Certbot)
-    ssl_certificate /etc/letsencrypt/live/api.symplus.dev/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/api.symplus.dev/privkey.pem;
-    
-    # Configurações SSL
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
-
-    # Logs
-    access_log /var/log/nginx/symplus-api-access.log;
-    error_log /var/log/nginx/symplus-api-error.log;
-
-    # Tamanho máximo de upload
-    client_max_body_size 50M;
-
-    # Proxy para container Docker
-    location / {
-        proxy_pass http://localhost:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Forwarded-Host $host;
-        proxy_set_header X-Forwarded-Port $server_port;
-        
-        # Timeouts
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
-    }
-
-    # Health check
-    location /api/health {
-        proxy_pass http://localhost:8000/api/health;
-        access_log off;
-    }
-}
-```
-
-### 2. Habilitar Site
+### 1. Criar Estrutura de Diretórios
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/symplus-api /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
+sudo mkdir -p /var/www/symplus/{releases,shared/backend,scripts}
+sudo chown -R 1001:1001 /var/www/symplus
 ```
 
-### 3. Configurar SSL com Let's Encrypt
+### 2. Configurar Shared (.env e storage)
+
+#### Primeira vez - Copiar .env
 
 ```bash
-# Obter certificado SSL
-sudo certbot --nginx -d api.symplus.dev
+# Se já existe um .env em produção, movê-lo para shared
+sudo mv /var/www/symplus/backend/.env /var/www/symplus/shared/backend/.env
 
-# Renovação automática (já configurado por padrão)
-sudo certbot renew --dry-run
-```
-
----
-
-## 📱 Configuração do App Flutter
-
-### Opção 1: Deploy do App Web no Nginx
-
-#### 1. Build do App Web
-
-```bash
-cd /var/www/symplus/app
-flutter build web --release --web-renderer html
-```
-
-#### 2. Configurar Nginx para App Web
-
-```bash
-sudo nano /etc/nginx/sites-available/symplus-app
-```
-
-**Conteúdo:**
-
-```nginx
-server {
-    listen 80;
-    server_name app.symplus.dev;
-    return 301 https://$server_name$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name app.symplus.dev;
-
-    ssl_certificate /etc/letsencrypt/live/app.symplus.dev/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/app.symplus.dev/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-
-    root /var/www/symplus/app/build/web;
-    index index.html;
-
-    # Gzip
-    gzip on;
-    gzip_vary on;
-    gzip_min_length 1024;
-    gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    # Cache para assets estáticos
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-}
-```
-
-#### 3. Habilitar e Configurar SSL
-
-```bash
-sudo ln -s /etc/nginx/sites-available/symplus-app /etc/nginx/sites-enabled/
-sudo certbot --nginx -d app.symplus.dev
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-### Opção 2: Deploy em Vercel/Netlify (Recomendado)
-
-Veja o arquivo `app/docs/SHARING_WEB_APP.md` para instruções detalhadas.
-
-**Vantagens:**
-- CDN global
-- HTTPS automático
-- Deploy automático via Git
-- Melhor performance
-
----
-
-## 🔒 SSL/HTTPS com Let's Encrypt
-
-### Configuração Inicial
-
-```bash
-# Para cada domínio
-sudo certbot --nginx -d api.symplus.dev
-sudo certbot --nginx -d app.symplus.dev
-
-# Verificar renovação automática
-sudo certbot renew --dry-run
-```
-
-### Renovação Automática
-
-O Certbot já configura renovação automática via cron. Verifique:
-
-```bash
-sudo systemctl status certbot.timer
-```
-
----
-
-## 📊 Monitoramento e Manutenção
-
-### 1. Laravel Horizon (Filas)
-
-Criar systemd service:
-
-```bash
-sudo nano /etc/systemd/system/symplus-horizon.service
-```
-
-**Conteúdo:**
-
-```ini
-[Unit]
-Description=Symplus Horizon Queue Worker
-After=network.target
-
-[Service]
-Type=simple
-User=www-data
-WorkingDirectory=/var/www/symplus/backend
-ExecStart=/usr/bin/docker compose -f docker-compose.prod.yml exec -T php php artisan horizon
-Restart=always
-RestartSec=3
-
-[Install]
-WantedBy=multi-user.target
-```
-
-**Ativar:**
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable symplus-horizon
-sudo systemctl start symplus-horizon
-sudo systemctl status symplus-horizon
-```
-
-### 2. Logs
-
-```bash
-# Logs do Docker
-docker compose -f docker-compose.prod.yml logs -f
-
-# Logs do Laravel
-tail -f /var/www/symplus/backend/storage/logs/laravel.log
-
-# Logs do Nginx
-sudo tail -f /var/log/nginx/symplus-api-error.log
-```
-
-### 3. Monitoramento de Recursos
-
-```bash
-# Uso de recursos
-docker stats
-
-# Espaço em disco
-df -h
-du -sh /var/www/symplus/*
-
-# Memória
-free -h
-```
-
-### 4. Comandos Úteis
-
-```bash
-# Reiniciar containers
-docker compose -f docker-compose.prod.yml restart
-
-# Atualizar código
+# OU criar novo a partir do exemplo
 cd /var/www/symplus
-git pull
-cd backend
-docker compose -f docker-compose.prod.yml exec php composer install --optimize-autoloader --no-dev
-docker compose -f docker-compose.prod.yml exec php php artisan migrate --force
-docker compose -f docker-compose.prod.yml exec php php artisan config:cache
-docker compose -f docker-compose.prod.yml exec php php artisan route:cache
-docker compose -f docker-compose.prod.yml exec php php artisan view:cache
+git clone https://github.com/WendeelMarinho/symplus.git temp_clone
+cp temp_clone/backend/.env.example /var/www/symplus/shared/backend/.env
+rm -rf temp_clone
 
-# Limpar cache
-docker compose -f docker-compose.prod.yml exec php php artisan cache:clear
-docker compose -f docker-compose.prod.yml exec php php artisan config:clear
-docker compose -f docker-compose.prod.yml exec php php artisan route:clear
-docker compose -f docker-compose.prod.yml exec php php artisan view:clear
+# Editar .env
+nano /var/www/symplus/shared/backend/.env
 ```
 
----
+**Configure as variáveis importantes:**
+- `APP_ENV=production`
+- `APP_DEBUG=false`
+- `APP_URL=https://seu-dominio.com`
+- `DB_*` (credenciais do banco)
+- `REDIS_*` (se aplicável)
+- `AWS_*` (MinIO/S3)
 
-## 💾 Backup e Restauração
-
-### Script de Backup Automático
-
-Criar script:
+#### Mover Storage (se já existe)
 
 ```bash
-sudo nano /usr/local/bin/symplus-backup.sh
+# Se já existe storage em produção
+sudo mv /var/www/symplus/backend/storage /var/www/symplus/shared/backend/storage
+
+# OU criar estrutura vazia
+sudo mkdir -p /var/www/symplus/shared/backend/storage/{framework/{cache,sessions,views},logs,app/public}
+sudo chown -R 1001:1001 /var/www/symplus/shared/backend/storage
+sudo chmod -R 775 /var/www/symplus/shared/backend/storage
 ```
 
-**Conteúdo:**
+### 3. Configurar SSH Key para GitHub (Opcional)
+
+Se o repositório for privado ou você quiser usar SSH:
 
 ```bash
-#!/bin/bash
+# Gerar chave SSH (se não tiver)
+ssh-keygen -t ed25519 -C "vps-deploy@symplus" -f ~/.ssh/github_symplus
 
-BACKUP_DIR="/var/backups/symplus"
-DATE=$(date +%Y%m%d_%H%M%S)
-RETENTION_DAYS=7
-
-mkdir -p $BACKUP_DIR
-
-# Backup do banco de dados
-docker compose -f /var/www/symplus/backend/docker-compose.prod.yml exec -T db mysqldump -u symplus_user -psenha_forte symplus_prod > $BACKUP_DIR/db_$DATE.sql
-
-# Backup do storage
-tar -czf $BACKUP_DIR/storage_$DATE.tar.gz -C /var/www/symplus/backend storage
-
-# Backup do MinIO
-docker compose -f /var/www/symplus/backend/docker-compose.prod.yml exec -T minio mc mirror /data $BACKUP_DIR/minio_$DATE/
-
-# Compactar tudo
-tar -czf $BACKUP_DIR/backup_$DATE.tar.gz -C $BACKUP_DIR db_$DATE.sql storage_$DATE.tar.gz minio_$DATE/
-
-# Remover arquivos antigos
-find $BACKUP_DIR -name "backup_*.tar.gz" -mtime +$RETENTION_DAYS -delete
-
-echo "Backup concluído: backup_$DATE.tar.gz"
-```
-
-**Tornar executável e agendar:**
-
-```bash
-sudo chmod +x /usr/local/bin/symplus-backup.sh
-
-# Adicionar ao crontab (backup diário às 2h da manhã)
-sudo crontab -e
-# Adicionar linha:
-0 2 * * * /usr/local/bin/symplus-backup.sh
-```
-
-### Restauração
-
-```bash
-# Extrair backup
-tar -xzf backup_YYYYMMDD_HHMMSS.tar.gz
-
-# Restaurar banco
-docker compose -f docker-compose.prod.yml exec -T db mysql -u symplus_user -psenha_forte symplus_prod < db_YYYYMMDD_HHMMSS.sql
-
-# Restaurar storage
-tar -xzf storage_YYYYMMDD_HHMMSS.tar.gz -C /var/www/symplus/backend
-```
-
----
-
-## 🔧 Troubleshooting
-
-### Problemas Comuns
-
-#### 1. Containers não iniciam
-
-```bash
-# Verificar logs
-docker compose -f docker-compose.prod.yml logs
-
-# Verificar se portas estão em uso
-sudo netstat -tulpn | grep :8000
-```
-
-#### 2. Erro de permissões
-
-```bash
-# Corrigir permissões do storage
-sudo chown -R www-data:www-data /var/www/symplus/backend/storage
-sudo chmod -R 775 /var/www/symplus/backend/storage
-```
-
-#### 3. Erro de conexão com banco
-
-```bash
-# Verificar se container do banco está rodando
-docker compose -f docker-compose.prod.yml ps
+# Adicionar chave pública ao GitHub
+cat ~/.ssh/github_symplus.pub
+# Copie e adicione em: https://github.com/settings/keys
 
 # Testar conexão
-docker compose -f docker-compose.prod.yml exec db mysql -u symplus_user -p
+ssh -T git@github.com
 ```
 
-#### 4. SSL não funciona
+### 4. Clonar Scripts de Deploy
 
 ```bash
-# Verificar certificados
-sudo certbot certificates
-
-# Renovar manualmente
-sudo certbot renew
+cd /var/www/symplus
+git clone https://github.com/WendeelMarinho/symplus.git temp_clone
+cp temp_clone/scripts/vps_deploy.sh scripts/
+cp temp_clone/scripts/vps_rollback.sh scripts/
+chmod +x scripts/*.sh
+rm -rf temp_clone
 ```
 
-#### 5. App Flutter não conecta na API
+---
 
-- Verificar CORS no Laravel
-- Verificar URL da API no `api_config.dart`
-- Verificar se API está acessível via HTTPS
+## 🚀 Deploy Automatizado
+
+### Via GitHub Actions (Recomendado)
+
+O workflow `.github/workflows/deploy.yml` executa automaticamente em push na branch `main`.
+
+**Configurar secrets no GitHub:**
+- `VPS_HOST`: IP ou domínio da VPS
+- `VPS_USER`: Usuário SSH (ex: `root`)
+- `VPS_SSH_KEY`: Chave SSH privada para acesso à VPS
+
+### Via SSH Remoto
+
+Execute o deploy de sua máquina local:
+
+```bash
+export VPS_HOST="srv1113923.hstgr.cloud"
+export VPS_USER="root"
+export VPS_PATH="/var/www/symplus"
+export GIT_REPO="https://github.com/WendeelMarinho/symplus.git"
+export BRANCH="main"
+export DOMAIN_HEALTHCHECK="https://srv1113923.hstgr.cloud/api/health"
+
+# Executar deploy
+ssh ${VPS_USER}@${VPS_HOST} "bash -s" < scripts/vps_deploy.sh
+```
 
 ---
 
-## ✅ Checklist de Deploy
+## 🖥️ Deploy Manual (Na VPS)
 
-- [ ] VPS configurada com Docker e Nginx
-- [ ] Domínios apontando para IP da VPS
-- [ ] SSL configurado para todos os domínios
-- [ ] Variáveis de ambiente configuradas
-- [ ] Banco de dados criado e migrations executadas
-- [ ] Storage linkado e permissões corretas
-- [ ] Cache otimizado (config, route, view)
-- [ ] Laravel Horizon configurado e rodando
-- [ ] Backup automático configurado
-- [ ] Monitoramento configurado
-- [ ] App Flutter buildado e deployado
-- [ ] Testes de funcionalidades básicas
+Execute diretamente na VPS:
+
+```bash
+cd /var/www/symplus
+
+# Configurar variáveis
+export VPS_PATH="/var/www/symplus"
+export GIT_REPO="https://github.com/WendeelMarinho/symplus.git"
+export BRANCH="main"
+export DOMAIN_HEALTHCHECK="https://srv1113923.hstgr.cloud/api/health"
+
+# Executar deploy
+bash scripts/vps_deploy.sh
+```
+
+### O que o script faz?
+
+1. ✅ Valida pré-requisitos (git, docker, curl)
+2. ✅ Cria estrutura de diretórios
+3. ✅ Clona código do GitHub para nova release
+4. ✅ Configura symlinks para `.env` e `storage` (shared)
+5. ✅ Configura permissões (UID/GID 1001:1001)
+6. ✅ Faz pull de imagens Docker
+7. ✅ Build e inicia containers
+8. ✅ Executa migrations do Laravel
+9. ✅ Otimiza aplicação (cache, routes)
+10. ✅ Reinicia filas/Horizon
+11. ✅ Healthcheck da aplicação
+12. ✅ Ativa nova release (atualiza symlink `current`)
+13. ✅ Limpa releases antigas (mantém últimas 5)
 
 ---
 
-## 📚 Recursos Adicionais
+## 🔄 Rollback
 
-- [Documentação Laravel Deployment](https://laravel.com/docs/deployment)
-- [Docker Compose Production](https://docs.docker.com/compose/production/)
-- [Nginx Best Practices](https://www.nginx.com/resources/wiki/start/topics/tutorials/config_pitfalls/)
-- [Let's Encrypt Documentation](https://letsencrypt.org/docs/)
+Se algo der errado no deploy, reverta para a release anterior:
+
+### Rollback Manual
+
+```bash
+cd /var/www/symplus
+
+export VPS_PATH="/var/www/symplus"
+export DOMAIN_HEALTHCHECK="https://srv1113923.hstgr.cloud/api/health"
+
+# Executar rollback
+bash scripts/vps_rollback.sh
+```
+
+### O que o rollback faz?
+
+1. ✅ Identifica release atual
+2. ✅ Encontra release anterior (mais recente)
+3. ✅ Atualiza symlink `current` para release anterior
+4. ✅ Reinicia containers na release anterior
+5. ✅ Healthcheck rápido
+6. ✅ Mantém release que falhou para análise
+
+**Nota:** A release que falhou não é removida, permitindo análise posterior.
 
 ---
 
-**🎉 Parabéns! Sua aplicação está em produção!**
+## 🌐 Nginx + PHP-FPM
 
-Para suporte, abra uma issue no GitHub ou consulte a documentação em `docs/`.
+### Configuração
 
+O Nginx está configurado para:
+- Servir arquivos estáticos do diretório `public/`
+- Encaminhar requisições PHP para `php:9000` (PHP-FPM)
+- Tratar rotas `/api/*` com suporte a CORS preflight
+- Usar `try_files` para rotear todas as requisições para `index.php` (Laravel)
+
+**Arquivo de configuração:** `backend/nginx/default.conf`
+
+**Principais diretivas:**
+- `root /var/www/symplus/backend/public` - Diretório raiz do Laravel
+- `fastcgi_pass php:9000` - Conecta ao serviço PHP-FPM via Docker network
+- `location ^~ /api/` - Trata rotas de API com CORS preflight
+- `try_files $uri $uri/ /index.php?$query_string` - Roteamento Laravel
+
+**Verificar configuração:**
+```bash
+# Testar sintaxe Nginx
+docker compose -f docker-compose.prod.yml exec nginx nginx -t
+
+# Ver logs do Nginx
+docker compose -f docker-compose.prod.yml logs nginx --tail 50
+
+# Verificar se PHP-FPM está acessível
+docker compose -f docker-compose.prod.yml exec nginx ping -c 2 php
+```
+
+---
+
+## 🔍 Troubleshooting
+
+### Problema: Permissões (Permission denied)
+
+**Sintoma:** Erros de escrita em `storage/` ou `bootstrap/cache/`
+
+**Solução:**
+```bash
+# Verificar UID/GID
+id -u  # Deve ser 1001
+id -g  # Deve ser 1001
+
+# Ajustar permissões manualmente
+sudo chown -R 1001:1001 /var/www/symplus/shared/backend/storage
+sudo chmod -R 775 /var/www/symplus/shared/backend/storage
+
+# Se necessário, aplicar ACL
+cd /var/www/symplus/current/backend
+make fixperm
+```
+
+### Problema: Healthcheck falha
+
+**Sintoma:** Script para com erro "Healthcheck falhou"
+
+**Solução:**
+```bash
+# Verificar logs dos containers
+cd /var/www/symplus/current/backend
+docker compose -f docker-compose.prod.yml logs php
+docker compose -f docker-compose.prod.yml logs nginx
+
+# Verificar se containers estão rodando
+docker compose -f docker-compose.prod.yml ps
+
+# Testar manualmente
+curl -v https://seu-dominio.com/api/health
+
+# Se necessário, fazer rollback
+bash scripts/vps_rollback.sh
+```
+
+### Problema: Migrations falham
+
+**Sintoma:** Erro ao executar `php artisan migrate`
+
+**Solução:**
+```bash
+# Verificar conexão com banco
+cd /var/www/symplus/current/backend
+docker compose -f docker-compose.prod.yml exec php php artisan tinker
+>>> DB::connection()->getPdo();
+
+# Verificar .env
+cat /var/www/symplus/shared/backend/.env | grep DB_
+
+# Executar migrations manualmente
+docker compose -f docker-compose.prod.yml exec php php artisan migrate --force
+```
+
+### Problema: CORS errors
+
+**Sintoma:** Erros de CORS no frontend (Flutter Web)
+
+**Solução:**
+```bash
+# Verificar config/cors.php
+cat /var/www/symplus/current/backend/config/cors.php
+
+# Verificar CorsMiddleware
+cat /var/www/symplus/current/backend/app/Http/Middleware/CorsMiddleware.php
+
+# Verificar Nginx (deve tratar OPTIONS)
+cat /var/www/symplus/current/backend/nginx/default.conf | grep -A 10 "location.*api"
+
+# Limpar cache
+cd /var/www/symplus/current/backend
+docker compose -f docker-compose.prod.yml exec php php artisan config:clear
+docker compose -f docker-compose.prod.yml exec php php artisan route:clear
+docker compose -f docker-compose.prod.yml exec php php artisan config:cache
+docker compose -f docker-compose.prod.yml exec php php artisan route:cache
+
+# Reiniciar Nginx
+docker compose -f docker-compose.prod.yml restart nginx
+
+# Testar CORS manualmente
+curl -v -X OPTIONS http://localhost:8000/api/health \
+  -H "Origin: http://localhost:33337" \
+  -H "Access-Control-Request-Method: GET"
+```
+
+**CORS para Flutter Web:**
+
+O sistema está configurado para aceitar requisições de:
+- `http://localhost:*` (qualquer porta)
+- `http://127.0.0.1:*` (qualquer porta)
+- `https://srv1113923.hstgr.cloud`
+- Domínios `*.hstgr.cloud`
+
+O Nginx trata requisições OPTIONS (preflight) diretamente, retornando 204 com headers CORS apropriados. O Laravel também aplica headers CORS via `CorsMiddleware` em todas as respostas da API.
+
+**Verificar CORS funcionando:**
+```bash
+# Testar preflight
+curl -v -X OPTIONS http://localhost:8000/api/auth/login \
+  -H "Origin: http://localhost:33337" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: Content-Type"
+
+# Deve retornar:
+# HTTP/1.1 204 No Content
+# Access-Control-Allow-Origin: http://localhost:33337
+# Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+# Access-Control-Allow-Headers: Authorization,Content-Type,Accept,Origin,X-Requested-With,X-Organization-Id
+# Access-Control-Allow-Credentials: true
+```
+
+### Problema: Cache Laravel não atualiza
+
+**Sintoma:** Mudanças não aparecem após deploy
+
+**Solução:**
+```bash
+cd /var/www/symplus/current/backend
+docker compose -f docker-compose.prod.yml exec php php artisan optimize:clear
+docker compose -f docker-compose.prod.yml exec php php artisan optimize
+```
+
+### Problema: Containers não iniciam
+
+**Sintoma:** `docker compose up -d` falha
+
+**Solução:**
+```bash
+# Verificar logs
+cd /var/www/symplus/current/backend
+docker compose -f docker-compose.prod.yml logs
+
+# Verificar docker-compose.prod.yml
+cat docker-compose.prod.yml
+
+# Verificar se portas estão em uso
+sudo netstat -tulpn | grep -E '8000|3306|6379'
+
+# Rebuild forçado
+docker compose -f docker-compose.prod.yml up -d --build --force-recreate
+```
+
+---
+
+## 🔐 Segurança
+
+### .env não é commitado
+
+O arquivo `.env` fica em `/var/www/symplus/shared/backend/.env` e **nunca** é sobrescrito pelo deploy.
+
+### Releases antigas
+
+Releases antigas são mantidas por segurança (últimas 5). Para limpar manualmente:
+
+```bash
+# Listar releases
+ls -1t /var/www/symplus/releases
+
+# Remover release específica (cuidado!)
+rm -rf /var/www/symplus/releases/20251111120000
+```
+
+### Logs
+
+Logs do deploy são exibidos no console. Para salvar:
+
+```bash
+bash scripts/vps_deploy.sh 2>&1 | tee deploy_$(date +%Y%m%d_%H%M%S).log
+```
+
+---
+
+## 📊 Monitoramento
+
+### Verificar Release Ativa
+
+```bash
+ls -la /var/www/symplus/current
+readlink -f /var/www/symplus/current
+```
+
+### Listar Releases Disponíveis
+
+```bash
+ls -1t /var/www/symplus/releases
+```
+
+### Status dos Containers
+
+```bash
+cd /var/www/symplus/current/backend
+docker compose -f docker-compose.prod.yml ps
+```
+
+### Healthcheck Manual
+
+```bash
+curl -f https://seu-dominio.com/api/health
+```
+
+### Validação Rápida da Stack
+
+Execute o script de validação para verificar se todos os componentes estão funcionando:
+
+```bash
+cd /var/www/symplus/current/backend
+./scripts/check_stack.sh
+```
+
+O script verifica:
+1. ✅ Nginx respondendo em `http://localhost:8000`
+2. ✅ Rota `/api/health` retornando HTTP 200 com JSON válido
+3. ✅ PHP e Laravel funcionando (rotas registradas)
+4. ✅ Redis resolvendo via DNS (`redis`) e acessível na porta 6379
+5. ✅ CORS funcionando (OPTIONS preflight retorna 204/200)
+6. ✅ Containers Docker rodando
+
+**Comandos manuais de validação:**
+
+```bash
+# Testar Nginx
+curl -sS -D- http://localhost:8000/ | head -n 15
+
+# Testar /api/health
+curl -sS -D- http://localhost:8000/api/health | head -n 15
+
+# Verificar rotas Laravel
+docker compose -f docker-compose.prod.yml exec php php artisan route:list | grep -c /api/health
+
+# Verificar Redis DNS
+docker compose -f docker-compose.prod.yml exec php php -r "echo gethostbyname('redis'), PHP_EOL;"
+
+# Testar conexão Redis
+docker compose -f docker-compose.prod.yml exec php nc -zv redis 6379
+```
+
+---
+
+## 🤖 GitHub Actions (CI/CD)
+
+O workflow `.github/workflows/deploy.yml` automatiza o deploy em push na branch `main`.
+
+### Configurar Secrets
+
+No GitHub: Settings → Secrets and variables → Actions
+
+Adicionar:
+- `VPS_HOST`: IP ou domínio da VPS
+- `VPS_USER`: Usuário SSH
+- `VPS_SSH_KEY`: Chave SSH privada
+
+### Disparar Deploy
+
+- **Automático:** Push na branch `main`
+- **Manual:** Actions → Deploy → Run workflow
+
+### Logs
+
+Ver logs em: GitHub → Actions → Deploy workflow
+
+---
+
+## 📝 Checklist de Deploy
+
+Antes de fazer deploy em produção:
+
+- [ ] `.env` configurado corretamente
+- [ ] `APP_ENV=production`
+- [ ] `APP_DEBUG=false`
+- [ ] Credenciais de banco corretas
+- [ ] Storage com permissões corretas
+- [ ] Firewall configurado
+- [ ] SSL/HTTPS funcionando
+- [ ] Backup do banco realizado
+- [ ] Testes passando localmente
+
+---
+
+## 🆘 Suporte
+
+Em caso de problemas:
+
+1. Verificar logs: `docker compose logs`
+2. Verificar healthcheck: `curl https://seu-dominio.com/api/health`
+3. Fazer rollback: `bash scripts/vps_rollback.sh`
+4. Consultar documentação: `docs/`
+5. Abrir issue no GitHub
+
+---
+
+**Última atualização:** Novembro 2025

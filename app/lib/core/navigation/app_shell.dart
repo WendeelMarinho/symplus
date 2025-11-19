@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../auth/auth_provider.dart';
 import '../dev/dev_tools.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/toast_service.dart';
+import '../widgets/user_avatar.dart';
+import '../providers/avatar_provider.dart';
+import '../rbac/permission_helper.dart';
+import '../rbac/permissions_catalog.dart';
+import '../accessibility/telemetry_service.dart';
 import 'menu_catalog.dart';
 
 /// Shell adaptativo que alterna entre NavigationRail/Drawer (desktop) e BottomNavigation (mobile)
@@ -131,6 +137,18 @@ class _AppShellState extends ConsumerState<AppShell> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // Avatar no NavigationRail
+                      Consumer(
+                        builder: (context, ref, child) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 16.0),
+                            child: UserAvatar(
+                              radius: 24,
+                              onTap: () => context.go('/app/profile'),
+                            ),
+                          );
+                        },
+                      ),
                       IconButton(
                         icon: const Icon(Icons.logout),
                         onPressed: () => _handleLogout(context),
@@ -156,7 +174,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     );
   }
 
-  /// Layout para mobile (BottomNavigation)
+  /// Layout para mobile (BottomNavigation + FAB central)
   Widget _buildMobileLayout(
     BuildContext context,
     AuthState authState,
@@ -185,6 +203,21 @@ class _AppShellState extends ConsumerState<AppShell> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Avatar
+                        Consumer(
+                          builder: (context, ref, child) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12.0),
+                              child: UserAvatar(
+                                radius: 32,
+                                onTap: () {
+                                  Navigator.of(context).pop();
+                                  context.go('/app/profile');
+                                },
+                              ),
+                            );
+                          },
+                        ),
                         Text(
                           authState.organizationName ?? 'Symplus',
                           style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -248,6 +281,8 @@ class _AppShellState extends ConsumerState<AppShell> {
           );
         }).toList(),
       ),
+      floatingActionButton: _buildFAB(context, authState),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }
 
@@ -277,6 +312,19 @@ class _AppShellState extends ConsumerState<AppShell> {
         
         // Dev Tools (apenas em debug mode)
         const DevToolsButton(),
+        
+        // Avatar do usuário/empresa
+        Consumer(
+          builder: (context, ref, child) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: UserAvatar(
+                radius: 20,
+                onTap: () => context.go('/app/profile'),
+              ),
+            );
+          },
+        ),
         
         // Info da organização (desktop)
         if (isWide)
@@ -461,6 +509,112 @@ class _AppShellState extends ConsumerState<AppShell> {
       case UserRole.user:
         return 'USUÁRIO';
     }
+  }
+
+  /// FAB central com action sheet
+  Widget? _buildFAB(BuildContext context, AuthState authState) {
+    // Verificar se há pelo menos uma ação permitida
+    final canCreateTransaction = PermissionHelper.hasPermission(authState, Permission.transactionsCreate);
+    final canCreateAccount = authState.role == UserRole.owner || authState.role == UserRole.admin;
+    final canCreateCategory = PermissionHelper.hasPermission(authState, Permission.categoriesCreate);
+    final canUploadDocument = PermissionHelper.hasPermission(authState, Permission.documentsUpload);
+    final canCreateRequest = PermissionHelper.hasPermission(authState, Permission.requestsCreate);
+
+    // Se não tem nenhuma permissão, não mostra o FAB
+    if (!canCreateTransaction && !canCreateAccount && !canCreateCategory && !canUploadDocument && !canCreateRequest) {
+      return null;
+    }
+
+    return FloatingActionButton(
+      onPressed: () => _showAddActionSheet(context, authState),
+      tooltip: 'Adicionar',
+      child: const Icon(Icons.add),
+    );
+  }
+
+  /// Action sheet para adicionar itens
+  void _showAddActionSheet(BuildContext context, AuthState authState) {
+    final canCreateTransaction = PermissionHelper.hasPermission(authState, Permission.transactionsCreate);
+    final canCreateAccount = authState.role == UserRole.owner || authState.role == UserRole.admin;
+    final canCreateCategory = PermissionHelper.hasPermission(authState, Permission.categoriesCreate);
+    final canUploadDocument = PermissionHelper.hasPermission(authState, Permission.documentsUpload);
+    final canCreateRequest = PermissionHelper.hasPermission(authState, Permission.requestsCreate);
+
+    TelemetryService.logAction('ui_quick_action_click', metadata: {'source': 'fab'});
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'Adicionar',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+            ),
+            if (canCreateTransaction)
+              ListTile(
+                leading: const Icon(Icons.swap_horiz, color: Colors.green),
+                title: const Text('Transação'),
+                onTap: () {
+                  Navigator.pop(context);
+                  TelemetryService.logAction('ui_add_transaction_clicked', metadata: {'source': 'fab'});
+                  context.go('/app/transactions?action=create');
+                },
+              ),
+            if (canCreateAccount)
+              ListTile(
+                leading: const Icon(Icons.account_balance_wallet, color: Colors.indigo),
+                title: const Text('Conta'),
+                onTap: () {
+                  Navigator.pop(context);
+                  TelemetryService.logAction('ui_add_account_clicked', metadata: {'source': 'fab'});
+                  context.go('/app/accounts?action=create');
+                },
+              ),
+            if (canCreateCategory)
+              ListTile(
+                leading: const Icon(Icons.category, color: Colors.purple),
+                title: const Text('Categoria'),
+                onTap: () {
+                  Navigator.pop(context);
+                  TelemetryService.logAction('ui_add_category_clicked', metadata: {'source': 'fab'});
+                  context.go('/app/categories?action=create');
+                },
+              ),
+            if (canUploadDocument)
+              ListTile(
+                leading: const Icon(Icons.folder, color: Colors.blue),
+                title: const Text('Documento'),
+                onTap: () {
+                  Navigator.pop(context);
+                  TelemetryService.logAction('ui_add_document_clicked', metadata: {'source': 'fab'});
+                  context.go('/app/documents?action=upload');
+                },
+              ),
+            if (canCreateRequest)
+              ListTile(
+                leading: const Icon(Icons.support_agent, color: Colors.orange),
+                title: const Text('Solicitação'),
+                onTap: () {
+                  Navigator.pop(context);
+                  TelemetryService.logAction('ui_add_request_clicked', metadata: {'source': 'fab'});
+                  context.go('/app/requests?action=create');
+                },
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
   }
 }
 

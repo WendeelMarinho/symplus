@@ -18,11 +18,13 @@ class CorsMiddleware
         // Get origin from request
         $origin = $request->header('Origin');
         
-        // Debug: log para verificar se middleware está sendo executado
-        \Log::debug('CorsMiddleware executed', [
+        // Debug: log detalhado para diagnóstico
+        \Log::info('CorsMiddleware executed', [
             'origin' => $origin,
             'method' => $request->getMethod(),
             'path' => $request->path(),
+            'url' => $request->fullUrl(),
+            'headers' => $request->headers->all(),
         ]);
         
         // Lista de origens permitidas (desenvolvimento e produção)
@@ -71,6 +73,10 @@ class CorsMiddleware
 
         // Handle preflight OPTIONS requests
         if ($request->getMethod() === 'OPTIONS') {
+            \Log::info('CorsMiddleware: Handling OPTIONS preflight', [
+                'origin' => $origin,
+                'allowedOrigin' => $allowedOrigin,
+            ]);
             return response('', 204)
                 ->header('Access-Control-Allow-Origin', $allowedOrigin)
                 ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH')
@@ -97,6 +103,13 @@ class CorsMiddleware
         if ($allowedOrigin !== '*') {
             $response->headers->set('Access-Control-Allow-Credentials', 'true');
         }
+        
+        \Log::info('CorsMiddleware: Response headers set', [
+            'origin' => $origin,
+            'allowedOrigin' => $allowedOrigin,
+            'status' => $response->getStatusCode(),
+            'headers' => $response->headers->all(),
+        ]);
 
         return $response;
     }

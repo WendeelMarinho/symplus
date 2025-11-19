@@ -257,80 +257,100 @@ class _RequestDetailPageState extends ConsumerState<RequestDetailPage> {
 
                                       // Timeline
                                       if (_ticket!.comments != null && _ticket!.comments!.isNotEmpty)
-                                        ..._ticket!.comments!.map((comment) {
-                                          return Padding(
-                                            padding: const EdgeInsets.only(bottom: 16),
-                                            child: Row(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                CircleAvatar(
-                                                  radius: 16,
-                                                  child: Text(
-                                                    comment.user['name'][0].toUpperCase(),
+                                        ..._ticket!.comments!.asMap().entries.map((entry) {
+                                          final index = entry.key;
+                                          final comment = entry.value;
+                                          final isLast = index == _ticket!.comments!.length - 1;
+                                          
+                                          return Row(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              // Linha vertical e avatar
+                                              Column(
+                                                children: [
+                                                  CircleAvatar(
+                                                    radius: 18,
+                                                    backgroundColor: comment.isInternal
+                                                        ? Colors.orange.shade100
+                                                        : Theme.of(context).colorScheme.primaryContainer,
+                                                    child: Text(
+                                                      comment.user['name'][0].toUpperCase(),
+                                                      style: TextStyle(
+                                                        fontWeight: FontWeight.bold,
+                                                        color: comment.isInternal
+                                                            ? Colors.orange.shade700
+                                                            : Theme.of(context).colorScheme.primary,
+                                                      ),
+                                                    ),
                                                   ),
-                                                ),
-                                                const SizedBox(width: 12),
-                                                Expanded(
-                                                  child: Column(
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                                    children: [
-                                                      Row(
-                                                        children: [
-                                                          Text(
-                                                            comment.user['name'],
-                                                            style: Theme.of(context)
-                                                                .textTheme
-                                                                .bodyMedium
-                                                                ?.copyWith(
-                                                                  fontWeight: FontWeight.bold,
-                                                                ),
-                                                          ),
-                                                          const SizedBox(width: 8),
-                                                          Text(
-                                                            DateFormat('dd/MM/yyyy HH:mm')
-                                                                .format(comment.createdAt),
-                                                            style: Theme.of(context)
-                                                                .textTheme
-                                                                .bodySmall
-                                                                ?.copyWith(
-                                                                  color: Theme.of(context)
-                                                                      .colorScheme
-                                                                      .onSurface
-                                                                      .withOpacity(0.6),
-                                                                ),
-                                                          ),
-                                                          if (comment.isInternal) ...[
-                                                            const SizedBox(width: 8),
-                                                            Container(
-                                                              padding: const EdgeInsets.symmetric(
-                                                                  horizontal: 6, vertical: 2),
-                                                              decoration: BoxDecoration(
-                                                                color: Colors.orange.withOpacity(0.2),
-                                                                borderRadius:
-                                                                    BorderRadius.circular(8),
-                                                              ),
+                                                  if (!isLast)
+                                                    Container(
+                                                      width: 2,
+                                                      height: 40,
+                                                      color: Colors.grey.shade300,
+                                                      margin: const EdgeInsets.symmetric(vertical: 4),
+                                                    ),
+                                                ],
+                                              ),
+                                              const SizedBox(width: 16),
+                                              // Conteúdo do comentário
+                                              Expanded(
+                                                child: Card(
+                                                  elevation: 0,
+                                                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                                  child: Padding(
+                                                    padding: const EdgeInsets.all(12),
+                                                    child: Column(
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      children: [
+                                                        Row(
+                                                          children: [
+                                                            Expanded(
                                                               child: Text(
-                                                                'Interno',
-                                                                style: TextStyle(
-                                                                  fontSize: 10,
-                                                                  color: Colors.orange[700],
-                                                                ),
+                                                                comment.user['name'],
+                                                                style: Theme.of(context)
+                                                                    .textTheme
+                                                                    .titleSmall
+                                                                    ?.copyWith(
+                                                                      fontWeight: FontWeight.bold,
+                                                                    ),
                                                               ),
                                                             ),
+                                                            Text(
+                                                              DateFormat('dd/MM/yyyy HH:mm')
+                                                                  .format(comment.createdAt),
+                                                              style: Theme.of(context)
+                                                                  .textTheme
+                                                                  .bodySmall
+                                                                  ?.copyWith(
+                                                                    color: Theme.of(context)
+                                                                        .colorScheme
+                                                                        .onSurface
+                                                                        .withOpacity(0.6),
+                                                                  ),
+                                                            ),
                                                           ],
+                                                        ),
+                                                        if (comment.isInternal) ...[
+                                                          const SizedBox(height: 4),
+                                                          Chip(
+                                                            label: const Text('Interno'),
+                                                            backgroundColor: Colors.orange.shade50,
+                                                            side: BorderSide(color: Colors.orange.shade300),
+                                                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                          ),
                                                         ],
-                                                      ),
-                                                      const SizedBox(height: 4),
-                                                      Text(
-                                                        comment.comment,
-                                                        style:
-                                                            Theme.of(context).textTheme.bodyMedium,
-                                                      ),
-                                                    ],
+                                                        const SizedBox(height: 8),
+                                                        Text(
+                                                          comment.comment,
+                                                          style: Theme.of(context).textTheme.bodyMedium,
+                                                        ),
+                                                      ],
+                                                    ),
                                                   ),
                                                 ),
-                                              ],
-                                            ),
+                                              ),
+                                            ],
                                           );
                                         }).toList(),
 

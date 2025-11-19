@@ -1,22 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:dio/dio.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/widgets/page_header.dart';
 import '../../../../core/widgets/toast_service.dart';
 import '../../../../core/widgets/loading_state.dart';
 import '../../../../core/widgets/error_state.dart';
+import '../../../../core/auth/auth_provider.dart';
+import '../../../../core/rbac/permission_helper.dart';
+import '../../../../core/rbac/permissions_catalog.dart';
 import '../../data/services/report_service.dart';
 import '../../data/models/pl_report.dart';
 
-class ReportsPage extends StatefulWidget {
+class ReportsPage extends ConsumerStatefulWidget {
   const ReportsPage({super.key});
 
   @override
-  State<ReportsPage> createState() => _ReportsPageState();
+  ConsumerState<ReportsPage> createState() => _ReportsPageState();
 }
 
-class _ReportsPageState extends State<ReportsPage> {
+class _ReportsPageState extends ConsumerState<ReportsPage> {
   PlReport? _report;
   bool _isLoading = false;
   String? _error;
@@ -80,6 +85,50 @@ class _ReportsPageState extends State<ReportsPage> {
     return NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(value);
   }
 
+  Future<void> _exportToCSV() async {
+    if (_report == null) {
+      ToastService.showError(context, 'Nenhum relatório disponível para exportar');
+      return;
+    }
+
+    try {
+      final buffer = StringBuffer();
+      
+      // Cabeçalho
+      buffer.writeln('Relatório P&L - ${DateFormat('dd/MM/yyyy').format(_fromDate)} a ${DateFormat('dd/MM/yyyy').format(_toDate)}');
+      buffer.writeln('');
+      buffer.writeln('Resumo');
+      buffer.writeln('Receitas,${_formatCurrency(_report!.totalIncome).replaceAll('R\$ ', '').replaceAll('.', '').replaceAll(',', '.')}');
+      buffer.writeln('Despesas,${_formatCurrency(_report!.totalExpense).replaceAll('R\$ ', '').replaceAll('.', '').replaceAll(',', '.')}');
+      buffer.writeln('Lucro Líquido,${_formatCurrency(_report!.netProfit).replaceAll('R\$ ', '').replaceAll('.', '').replaceAll(',', '.')}');
+      buffer.writeln('');
+      
+      // Detalhamento
+      buffer.writeln('Detalhamento');
+      buffer.writeln(_groupBy == 'month' ? 'Mês' : 'Categoria,Receitas,Despesas,Lucro Líquido');
+      
+      for (var item in _report!.series) {
+        final label = _groupBy == 'month' ? item['month'] as String : item['category_name'] as String;
+        final income = (item['income'] as num).toDouble();
+        final expense = (item['expense'] as num).toDouble();
+        final net = (item['net'] as num).toDouble();
+        
+        buffer.writeln('$label,${income.toStringAsFixed(2)},${expense.toStringAsFixed(2)},${net.toStringAsFixed(2)}');
+      }
+
+      // Copiar para clipboard (para web, seria ideal fazer download)
+      await Clipboard.setData(ClipboardData(text: buffer.toString()));
+      ToastService.showSuccess(context, 'Relatório copiado para a área de transferência!');
+    } catch (e) {
+      ToastService.showError(context, 'Erro ao exportar: ${e.toString()}');
+    }
+  }
+
+  Future<void> _exportToPDF() async {
+    // Placeholder - em produção, usar um pacote como pdf ou printing
+    ToastService.showInfo(context, 'Exportação para PDF em breve');
+  }
+
   @override
   void initState() {
     super.initState();
@@ -88,12 +137,35 @@ class _ReportsPageState extends State<ReportsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
+    final canViewReports = PermissionHelper.hasPermission(authState, Permission.viewReportsPl);
+
+    if (!canViewReports) {
+      return const Center(
+        child: Text('Acesso não permitido'),
+      );
+    }
+
     return Column(
       children: [
         PageHeader(
           title: 'Relatórios (P&L)',
           subtitle: 'Visualize relatórios financeiros e análises',
           breadcrumbs: const ['Financeiro', 'Relatórios'],
+          actions: [
+            if (_report != null) ...[
+              IconButton(
+                icon: const Icon(Icons.file_download),
+                tooltip: 'Exportar CSV',
+                onPressed: _exportToCSV,
+              ),
+              IconButton(
+                icon: const Icon(Icons.picture_as_pdf),
+                tooltip: 'Exportar PDF',
+                onPressed: _exportToPDF,
+              ),
+            ],
+          ],
         ),
         // Filtros
         Card(
@@ -224,52 +296,121 @@ class _ReportsPageState extends State<ReportsPage> {
                               ),
                               const SizedBox(height: 16),
 
-                              // Gráfico ou Tabela
-                              if (_showChart)
-                                Card(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          _groupBy == 'month'
-                                              ? 'Evolução Mensal'
-                                              : 'Por Categoria',
-                                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                                fontWeight: FontWeight.bold,
+                              // Gráfico de barras empilhadas
+                              Card(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            _groupBy == 'month'
+                                                ? 'Receitas x Despesas por Mês'
+                                                : 'Receitas x Despesas por Categoria',
+                                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                          ),
+                                          Row(
+                                            children: [
+                                              Container(
+                                                width: 12,
+                                                height: 12,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.green,
+                                                  borderRadius: BorderRadius.circular(2),
+                                                ),
                                               ),
-                                        ),
-                                        const SizedBox(height: 16),
-                                        SizedBox(
-                                          height: 300,
-                                          child: _buildChart(),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                )
-                              else
-                                Card(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          _groupBy == 'month'
-                                              ? 'Detalhamento Mensal'
-                                              : 'Detalhamento por Categoria',
-                                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                                fontWeight: FontWeight.bold,
+                                              const SizedBox(width: 4),
+                                              const Text('Receitas', style: TextStyle(fontSize: 12)),
+                                              const SizedBox(width: 16),
+                                              Container(
+                                                width: 12,
+                                                height: 12,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.red,
+                                                  borderRadius: BorderRadius.circular(2),
+                                                ),
                                               ),
-                                        ),
-                                        const SizedBox(height: 16),
-                                        _buildTable(),
-                                      ],
-                                    ),
+                                              const SizedBox(width: 4),
+                                              const Text('Despesas', style: TextStyle(fontSize: 12)),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 16),
+                                      SizedBox(
+                                        height: 350,
+                                        child: _buildStackedBarChart(),
+                                      ),
+                                    ],
                                   ),
                                 ),
+                              ),
+                              const SizedBox(height: 16),
+                              // Tabela de resumo
+                              Card(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _groupBy == 'month'
+                                            ? 'Detalhamento Mensal'
+                                            : 'Detalhamento por Categoria',
+                                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      _buildTable(),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              // Card de regras de alerta (placeholder)
+                              Card(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(Icons.notifications_active, color: Colors.amber.shade700),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Regras de Alerta',
+                                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Configure alertas para receber notificações quando despesas ultrapassarem limites definidos.',
+                                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                                            ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      TextButton.icon(
+                                        icon: const Icon(Icons.settings),
+                                        label: const Text('Configurar alertas'),
+                                        onPressed: () {
+                                          ToastService.showInfo(context, 'Configuração de alertas em breve');
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -278,16 +419,123 @@ class _ReportsPageState extends State<ReportsPage> {
     );
   }
 
-  Widget _buildChart() {
+  Widget _buildStackedBarChart() {
     if (_report == null || _report!.series.isEmpty) {
       return const Center(child: Text('Sem dados para exibir'));
     }
 
-    if (_groupBy == 'month') {
-      return _buildMonthChart();
-    } else {
-      return _buildCategoryChart();
-    }
+    final series = _report!.series;
+    final maxValue = series.fold<double>(
+      0.0,
+      (max, item) {
+        final income = (item['income'] as num).toDouble();
+        final expense = (item['expense'] as num).toDouble();
+        return [income + expense, max].reduce((a, b) => a > b ? a : b);
+      },
+    );
+
+    return BarChart(
+      BarChartData(
+        alignment: BarChartAlignment.spaceBetween,
+        maxY: maxValue * 1.2,
+        groupsSpace: 16,
+        barGroups: series.asMap().entries.map((entry) {
+          final index = entry.key;
+          final item = entry.value;
+          final income = (item['income'] as num).toDouble();
+          final expense = (item['expense'] as num).toDouble();
+          
+          return BarChartGroupData(
+            x: index,
+            barRods: [
+              // Receitas (verde) - parte inferior
+              BarChartRodData(
+                fromY: 0,
+                toY: income,
+                color: Colors.green,
+                width: 20,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+              ),
+              // Despesas (vermelho) - empilhado sobre receitas
+              BarChartRodData(
+                fromY: income,
+                toY: income + expense,
+                color: Colors.red,
+                width: 20,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+              ),
+            ],
+          );
+        }).toList(),
+        titlesData: FlTitlesData(
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 60,
+              getTitlesWidget: (value, meta) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Text(
+                    _formatCurrency(value),
+                    style: const TextStyle(fontSize: 10),
+                    textAlign: TextAlign.right,
+                  ),
+                );
+              },
+            ),
+          ),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              getTitlesWidget: (value, meta) {
+                if (value.toInt() >= series.length) return const Text('');
+                final label = _groupBy == 'month'
+                    ? series[value.toInt()]['month'] as String
+                    : (series[value.toInt()]['category_name'] as String).length > 10
+                        ? '${(series[value.toInt()]['category_name'] as String).substring(0, 10)}...'
+                        : series[value.toInt()]['category_name'] as String;
+                return Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    label,
+                    style: const TextStyle(fontSize: 10),
+                  ),
+                );
+              },
+            ),
+          ),
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+        ),
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          horizontalInterval: maxValue / 5,
+        ),
+        borderData: FlBorderData(show: true),
+        barTouchData: BarTouchData(
+          touchTooltipData: BarTouchTooltipData(
+            tooltipRoundedRadius: 8,
+            tooltipBgColor: Colors.grey[800]!,
+            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+              final item = series[groupIndex];
+              final isIncome = rodIndex == 0;
+              final value = isIncome
+                  ? (item['income'] as num).toDouble()
+                  : (item['expense'] as num).toDouble();
+              return BarTooltipItem(
+                '${isIncome ? "Receita" : "Despesa"}: ${_formatCurrency(value)}',
+                const TextStyle(color: Colors.white, fontSize: 12),
+              );
+            },
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildMonthChart() {

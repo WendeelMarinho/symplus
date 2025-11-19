@@ -1,57 +1,39 @@
 #!/usr/bin/env bash
 # entrypoint.sh — prepara diretórios e permissões para Laravel
-#
-# Mudanças aplicadas:
-# - Cria estrutura de diretórios Laravel necessários
-# - Detecta UID/GID efetivo do processo
-# - Aplica ACL automaticamente se rodando como www-data (33:33) e diretórios são 1001:1001
-# - Se rodando como 1001:1001, apenas garante permissões 775 (sem ACL)
-# - Cria symlink storage:link se não existir
-# - Idempotente: pode ser executado múltiplas vezes sem problemas
-#
-# Uso: Este script é executado automaticamente pelo Docker como entrypoint do serviço PHP
+# Idempotente: pode ser executado múltiplas vezes sem problemas
 
 set -e
 
-cd /var/www/symplus/backend
+cd /var/www/html
 
 echo "[entrypoint] Preparando estrutura Laravel…"
-mkdir -p storage/framework/{cache,sessions,views} bootstrap/cache
+mkdir -p storage/logs storage/framework/{cache,sessions,views} bootstrap/cache
 
 # Detecta UID/GID efetivo
 EUID_CUR=$(id -u)
 EGID_CUR=$(id -g)
 echo "[entrypoint] Rodando como UID:GID ${EUID_CUR}:${EGID_CUR}"
 
+# Se rodando como root (UID 0), podemos fazer chown
+if [ "$EUID_CUR" = "0" ]; then
+  echo "[entrypoint] Rodando como root - aplicando permissões..."
+  chown -R www-data:www-data storage bootstrap/cache || true
+  chmod -R 775 storage bootstrap/cache || true
+else
+  # Se não for root, apenas garantir que os diretórios existem e têm permissões corretas
+  echo "[entrypoint] Rodando como usuário não-root - ajustando permissões..."
+  # Tentar chmod apenas (sem chown)
+  chmod -R 775 storage bootstrap/cache 2>/dev/null || true
+  # Se os diretórios pertencem ao usuário atual, está OK
+  # Caso contrário, o usuário do host precisa ter permissões adequadas
+fi
+
 # Tenta storage:link se não existir
 if [ ! -L "public/storage" ]; then
   echo "[entrypoint] Criando symlink public/storage -> storage/app/public"
-  php artisan storage:link || echo "[entrypoint] Aviso: storage:link falhou (pode não ter vendor ainda)"
+  php artisan storage:link || true
 fi
 
-# Se rodando como www-data (33:33) e dirs são 1001:1001, tenta ACL
-NEED_ACL=0
-if [ "$EUID_CUR" = "33" ] || [ "$EGID_CUR" = "33" ]; then
-  # Verifica owners dos dirs críticos
-  OWN_STORAGE=$(stat -c "%u:%g" storage 2>/dev/null || echo "0:0")
-  OWN_CACHE=$(stat -c "%u:%g" bootstrap/cache 2>/dev/null || echo "0:0")
-  if [ "$OWN_STORAGE" != "${EUID_CUR}:${EGID_CUR}" ] || [ "$OWN_CACHE" != "${EUID_CUR}:${EGID_CUR}" ]; then
-    NEED_ACL=1
-  fi
-fi
-
-if [ "$NEED_ACL" = "1" ]; then
-  echo "[entrypoint] Tentando aplicar ACL para www-data…"
-  if command -v setfacl >/dev/null 2>&1; then
-    setfacl -R  -m u:www-data:rwx storage bootstrap/cache || true
-    setfacl -dR -m u:www-data:rwx storage bootstrap/cache || true
-    echo "[entrypoint] ACL aplicada."
-  else
-    echo "[entrypoint] Aviso: setfacl não encontrado. Considere rodar o serviço 'fixperm' ou alinhar UID/GID pelo compose."
-  fi
-else
-  echo "[entrypoint] ACL não necessária (UID/GID já alinhado) — garantindo 775…"
-  chmod -R 775 storage bootstrap/cache || true
-fi
+echo "[entrypoint] Estrutura preparada com sucesso"
 
 exec "$@"

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
+import '../../../../core/providers/currency_provider.dart';
+import '../../../../core/utils/currency_formatter.dart';
 import '../../data/models/dashboard_data.dart';
 
 /// Gráfico de barras Receitas x Despesas (6 meses)
-class IncomeExpenseBarChart extends StatelessWidget {
+class IncomeExpenseBarChart extends ConsumerWidget {
   final List<MonthlyIncomeExpense> data;
   final Function(String month)? onBarTap;
 
@@ -14,12 +17,13 @@ class IncomeExpenseBarChart extends StatelessWidget {
     this.onBarTap,
   });
 
-  String _formatCurrency(double value) {
-    return NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$', decimalDigits: 0).format(value);
+  String _formatCurrency(double value, CurrencyState currencyState) {
+    return CurrencyFormatter.format(value, currencyState);
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currencyState = ref.watch(currencyProvider);
     if (data.isEmpty) {
       return const Center(child: Text('Sem dados para exibir'));
     }
@@ -63,7 +67,7 @@ class IncomeExpenseBarChart extends StatelessWidget {
               showTitles: true,
               getTitlesWidget: (value, meta) {
                 return Text(
-                  _formatCurrency(value),
+                  _formatCurrency(value, currencyState),
                   style: const TextStyle(fontSize: 10),
                 );
               },
@@ -94,13 +98,16 @@ class IncomeExpenseBarChart extends StatelessWidget {
           touchTooltipData: BarTouchTooltipData(
             tooltipRoundedRadius: 8,
             tooltipBgColor: Colors.grey[800]!,
+            tooltipPadding: const EdgeInsets.all(8),
             getTooltipItem: (group, groupIndex, rod, rodIndex) {
               final item = data[groupIndex];
               final isIncome = rodIndex == 0;
               final value = isIncome ? item.income : item.expenses;
+              final net = item.net;
               return BarTooltipItem(
-                '${isIncome ? "Receita" : "Despesa"}: ${_formatCurrency(value)}',
-                const TextStyle(color: Colors.white, fontSize: 12),
+                '${isIncome ? "Receita" : "Despesa"}: ${_formatCurrency(value, currencyState)}\n'
+                'Resultado: ${_formatCurrency(net, currencyState)}',
+                const TextStyle(color: Colors.white, fontSize: 12, height: 1.5),
               );
             },
           ),
@@ -120,7 +127,7 @@ class IncomeExpenseBarChart extends StatelessWidget {
 }
 
 /// Gráfico Donut - Top 5 Categorias de Despesa
-class TopCategoriesDonutChart extends StatelessWidget {
+class TopCategoriesDonutChart extends ConsumerWidget {
   final List<CategoryTotal> categories;
   final Function(int categoryId)? onSliceTap;
 
@@ -130,12 +137,13 @@ class TopCategoriesDonutChart extends StatelessWidget {
     this.onSliceTap,
   });
 
-  String _formatCurrency(double value) {
-    return NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(value);
+  String _formatCurrency(double value, CurrencyState currencyState) {
+    return CurrencyFormatter.format(value, currencyState);
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currencyState = ref.watch(currencyProvider);
     if (categories.isEmpty) {
       return const Center(child: Text('Sem dados para exibir'));
     }
@@ -183,6 +191,19 @@ class TopCategoriesDonutChart extends StatelessWidget {
                     }
                   }
                 },
+                touchTooltipData: PieTouchTooltipData(
+                  tooltipRoundedRadius: 8,
+                  tooltipBgColor: Colors.grey[800]!,
+                  tooltipPadding: const EdgeInsets.all(8),
+                  getTooltipItems: (touchedSection) {
+                    return [
+                      PieTooltipItem(
+                        '${touchedSection.title}\n${_formatCurrency(touchedSection.value, currencyState)}',
+                        const TextStyle(color: Colors.white, fontSize: 12, height: 1.5),
+                      ),
+                    ];
+                  },
+                ),
               ),
             ),
           ),
@@ -218,7 +239,7 @@ class TopCategoriesDonutChart extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      _formatCurrency(item.total),
+                      _formatCurrency(item.total, currencyState),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),

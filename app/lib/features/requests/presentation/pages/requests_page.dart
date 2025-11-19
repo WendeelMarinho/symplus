@@ -372,20 +372,56 @@ class _RequestsPageState extends ConsumerState<RequestsPage> {
     );
   }
 
+  Future<void> _moveToStage(ServiceRequest ticket, String newStatus) async {
+    try {
+      await ServiceRequestService.update(ticket.id, status: newStatus);
+      if (mounted) {
+        ToastService.showSuccess(context, 'Solicitação movida para ${_getStatusLabel(newStatus)}');
+        _loadTickets();
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastService.showError(context, 'Erro ao mover solicitação');
+      }
+    }
+  }
+
+  String _getStatusLabel(String status) {
+    switch (status) {
+      case 'open':
+        return 'Aberto';
+      case 'in_progress':
+        return 'Em Progresso';
+      case 'resolved':
+        return 'Resolvido';
+      case 'closed':
+        return 'Fechado';
+      default:
+        return status;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final canEdit = authState.role == 'owner' || authState.role == 'admin';
+    final isMobile = MediaQuery.of(context).size.width < 900;
 
     final hasFilters =
         _filterStatus != null || _filterPriority != null || _filterCategory != null;
 
+    // Agrupar tickets por status
+    final openTickets = _tickets.where((t) => t.isOpen).toList();
+    final inProgressTickets = _tickets.where((t) => t.isInProgress).toList();
+    final resolvedTickets = _tickets.where((t) => t.isResolved).toList();
+    final closedTickets = _tickets.where((t) => t.isClosed).toList();
+
     return Column(
       children: [
         PageHeader(
-          title: 'Tickets',
+          title: 'Solicitações',
           subtitle: 'Gerencie solicitações e acompanhe seus tickets',
-          breadcrumbs: const ['Suporte', 'Tickets'],
+          breadcrumbs: const ['Suporte', 'Solicitações'],
           actions: [
             if (hasFilters)
               IconButton(
@@ -411,8 +447,8 @@ class _RequestsPageState extends ConsumerState<RequestsPage> {
         ActionBar(
           actions: [
             ActionItem(
-              label: 'Novo Ticket',
-              icon: Icons.add,
+              label: 'Nova Solicitação',
+              icon: Icons.add_circle,
               onPressed: _showCreateDialog,
               type: ActionType.primary,
             ),
@@ -420,7 +456,7 @@ class _RequestsPageState extends ConsumerState<RequestsPage> {
         ),
         Expanded(
           child: _isLoading
-              ? const LoadingState(message: 'Carregando tickets...')
+              ? const LoadingState(message: 'Carregando solicitações...')
               : _error != null
                   ? ErrorState(
                       message: _error!,
@@ -429,100 +465,306 @@ class _RequestsPageState extends ConsumerState<RequestsPage> {
                   : _tickets.isEmpty
                       ? EmptyState(
                           icon: Icons.support_agent,
-                          title: 'Nenhum ticket encontrado',
-                          message: 'Crie um ticket para solicitar suporte ou reportar um problema.',
-                          actionLabel: 'Novo Ticket',
+                          title: 'Nenhuma solicitação encontrada',
+                          message: 'Crie uma solicitação para solicitar suporte ou reportar um problema.',
+                          actionLabel: 'Nova Solicitação',
                           onAction: _showCreateDialog,
                         )
-                      : RefreshIndicator(
-                          onRefresh: () {
-                            setState(() {
-                              _currentPage = 1;
-                            });
-                            return _loadTickets();
-                          },
-                          child: ListView.builder(
-                            itemCount: _tickets.length + (_hasMore ? 1 : 0),
-                            itemBuilder: (context, index) {
-                              if (index == _tickets.length) {
-                                return Padding(
-                                  padding: const EdgeInsets.all(16.0),
-                                  child: Center(
-                                    child: TextButton(
-                                      onPressed: () {
-                                        setState(() {
-                                          _currentPage++;
-                                        });
-                                        _loadTickets(showLoading: false);
-                                      },
-                                      child: const Text('Carregar mais'),
-                                    ),
-                                  ),
-                                );
-                              }
-
-                              final ticket = _tickets[index];
-                              return ListItemCard(
-                                title: ticket.title,
-                                subtitle:
-                                    '${ticket.createdBy['name']} • ${DateFormat('dd/MM/yyyy').format(ticket.createdAt)} • ${ticket.commentsCount ?? 0} comentários',
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: ticket.statusColor.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(color: ticket.statusColor),
-                                      ),
-                                      child: Text(
-                                        ticket.statusLabel,
-                                        style: TextStyle(
-                                          color: ticket.statusColor,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: ticket.priorityColor.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(color: ticket.priorityColor),
-                                      ),
-                                      child: Text(
-                                        ticket.priorityLabel,
-                                        style: TextStyle(
-                                          color: ticket.priorityColor,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                leadingIcon: Icons.support_agent,
-                                leadingColor: ticket.statusColor,
-                                onTap: () => _navigateToDetail(ticket.id),
-                                actions: [
-                                  if (canEdit)
-                                    IconButton(
-                                      icon: const Icon(Icons.delete, size: 20),
-                                      onPressed: () => _deleteTicket(ticket),
-                                      tooltip: 'Excluir',
-                                    ),
-                                ],
-                              );
-                            },
-                          ),
-                        ),
+                      : isMobile
+                          ? _buildMobileList(openTickets, inProgressTickets, resolvedTickets, closedTickets, canEdit)
+                          : _buildKanbanView(openTickets, inProgressTickets, resolvedTickets, closedTickets, canEdit),
         ),
       ],
+    );
+  }
+
+  Widget _buildMobileList(
+    List<ServiceRequest> openTickets,
+    List<ServiceRequest> inProgressTickets,
+    List<ServiceRequest> resolvedTickets,
+    List<ServiceRequest> closedTickets,
+    bool canEdit,
+  ) {
+    final allTickets = [
+      ...openTickets,
+      ...inProgressTickets,
+      ...resolvedTickets,
+      ...closedTickets,
+    ];
+
+    return RefreshIndicator(
+      onRefresh: () {
+        setState(() {
+          _currentPage = 1;
+        });
+        return _loadTickets();
+      },
+      child: ListView.builder(
+        itemCount: allTickets.length + (_hasMore ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index == allTickets.length) {
+            return Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Center(
+                child: TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _currentPage++;
+                    });
+                    _loadTickets(showLoading: false);
+                  },
+                  child: const Text('Carregar mais'),
+                ),
+              ),
+            );
+          }
+
+          final ticket = allTickets[index];
+          return _buildRequestCard(ticket, canEdit, isMobile: true);
+        },
+      ),
+    );
+  }
+
+  Widget _buildKanbanView(
+    List<ServiceRequest> openTickets,
+    List<ServiceRequest> inProgressTickets,
+    List<ServiceRequest> resolvedTickets,
+    List<ServiceRequest> closedTickets,
+    bool canEdit,
+  ) {
+    return RefreshIndicator(
+      onRefresh: () {
+        setState(() {
+          _currentPage = 1;
+        });
+        return _loadTickets();
+      },
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildKanbanColumn('Aberto', openTickets, Colors.blue, canEdit, 'open'),
+          _buildKanbanColumn('Em Progresso', inProgressTickets, Colors.orange, canEdit, 'in_progress'),
+          _buildKanbanColumn('Resolvido', resolvedTickets, Colors.green, canEdit, 'resolved'),
+          _buildKanbanColumn('Fechado', closedTickets, Colors.grey, canEdit, 'closed'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildKanbanColumn(
+    String title,
+    List<ServiceRequest> tickets,
+    Color color,
+    bool canEdit,
+    String status,
+  ) {
+    return Expanded(
+      child: Card(
+        margin: const EdgeInsets.all(8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: color,
+                        ),
+                  ),
+                  const SizedBox(width: 8),
+                  Chip(
+                    label: Text('${tickets.length}'),
+                    backgroundColor: color.withOpacity(0.2),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: tickets.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(
+                          'Nenhuma solicitação',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Colors.grey,
+                              ),
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(8),
+                      itemCount: tickets.length,
+                      itemBuilder: (context, index) {
+                        return _buildRequestCard(tickets[index], canEdit, isMobile: false, onStatusChanged: (newStatus) {
+                          _moveToStage(tickets[index], newStatus);
+                        });
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRequestCard(
+    ServiceRequest ticket,
+    bool canEdit, {
+    required bool isMobile,
+    Function(String)? onStatusChanged,
+  }) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: InkWell(
+        onTap: () => _navigateToDetail(ticket.id),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      ticket.title,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert, size: 18),
+                    onSelected: (value) {
+                      if (value == 'delete' && canEdit) {
+                        _deleteTicket(ticket);
+                      } else if (value.startsWith('move_') && onStatusChanged != null) {
+                        onStatusChanged(value.replaceFirst('move_', ''));
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      if (onStatusChanged != null && !ticket.isOpen)
+                        const PopupMenuItem(
+                          value: 'move_open',
+                          child: Row(
+                            children: [
+                              Icon(Icons.lock_open, size: 20),
+                              SizedBox(width: 8),
+                              Text('Mover para Aberto'),
+                            ],
+                          ),
+                        ),
+                      if (onStatusChanged != null && !ticket.isInProgress)
+                        const PopupMenuItem(
+                          value: 'move_in_progress',
+                          child: Row(
+                            children: [
+                              Icon(Icons.play_arrow, size: 20),
+                              SizedBox(width: 8),
+                              Text('Mover para Em Progresso'),
+                            ],
+                          ),
+                        ),
+                      if (onStatusChanged != null && !ticket.isResolved)
+                        const PopupMenuItem(
+                          value: 'move_resolved',
+                          child: Row(
+                            children: [
+                              Icon(Icons.check_circle, size: 20),
+                              SizedBox(width: 8),
+                              Text('Mover para Resolvido'),
+                            ],
+                          ),
+                        ),
+                      if (onStatusChanged != null && !ticket.isClosed)
+                        const PopupMenuItem(
+                          value: 'move_closed',
+                          child: Row(
+                            children: [
+                              Icon(Icons.close, size: 20),
+                              SizedBox(width: 8),
+                              Text('Mover para Fechado'),
+                            ],
+                          ),
+                        ),
+                      if (onStatusChanged != null) const PopupMenuDivider(),
+                      if (canEdit)
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete, size: 20, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text('Excluir', style: TextStyle(color: Colors.red)),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  Chip(
+                    label: Text(
+                      ticket.statusLabel,
+                      style: const TextStyle(fontSize: 10),
+                    ),
+                    backgroundColor: ticket.statusColor.withOpacity(0.1),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  Chip(
+                    label: Text(
+                      ticket.priorityLabel,
+                      style: const TextStyle(fontSize: 10),
+                    ),
+                    backgroundColor: ticket.priorityColor.withOpacity(0.1),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.person, size: 14, color: Colors.grey[600]),
+                  const SizedBox(width: 4),
+                  Text(
+                    ticket.createdBy['name'] ?? 'Usuário',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(width: 16),
+                  Icon(Icons.comment, size: 14, color: Colors.grey[600]),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${ticket.commentsCount ?? 0}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const Spacer(),
+                  Text(
+                    DateFormat('dd/MM/yyyy').format(ticket.createdAt),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

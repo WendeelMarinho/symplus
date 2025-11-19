@@ -10,6 +10,7 @@ class DocumentService {
     String? category,
     String? documentableType,
     int? documentableId,
+    String? search,
     int? page,
     int? perPage,
   }) async {
@@ -22,6 +23,9 @@ class DocumentService {
     }
     if (documentableId != null) {
       queryParams['documentable_id'] = documentableId;
+    }
+    if (search != null && search.isNotEmpty) {
+      queryParams['search'] = search;
     }
     if (page != null) {
       queryParams['page'] = page;

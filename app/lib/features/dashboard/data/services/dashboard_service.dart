@@ -4,9 +4,26 @@ import '../../../../config/api_config.dart';
 import '../models/dashboard_data.dart';
 
 class DashboardService {
-  static Future<DashboardData> getDashboard() async {
+  /// Busca dados do dashboard
+  /// 
+  /// [from] e [to] são opcionais - se não fornecidos, o backend retorna dados padrão
+  static Future<DashboardData> getDashboard({
+    String? from,
+    String? to,
+  }) async {
     try {
-      final response = await DioClient.get(ApiConfig.dashboard);
+      final queryParams = <String, dynamic>{};
+      if (from != null) {
+        queryParams['from'] = from;
+      }
+      if (to != null) {
+        queryParams['to'] = to;
+      }
+
+      final response = await DioClient.get(
+        ApiConfig.dashboard,
+        queryParameters: queryParams.isEmpty ? null : queryParams,
+      );
 
       if (response.statusCode == 200) {
         final data = response.data['data'] as Map<String, dynamic>;

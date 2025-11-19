@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:dio/dio.dart';
@@ -23,21 +24,55 @@ class DocumentsPage extends ConsumerStatefulWidget {
   ConsumerState<DocumentsPage> createState() => _DocumentsPageState();
 }
 
-class _DocumentsPageState extends ConsumerState<DocumentsPage> {
+class _DocumentsPageState extends ConsumerState<DocumentsPage> with SingleTickerProviderStateMixin {
   List<Document> _documents = [];
   bool _isLoading = true;
   String? _error;
   String? _filterCategory;
+  String? _searchQuery;
+  final TextEditingController _searchController = TextEditingController();
   int _currentPage = 1;
   int _totalPages = 1;
   bool _hasMore = false;
   bool _isUploading = false;
   double _uploadProgress = 0.0;
+  late TabController _tabController;
+  int _selectedTab = 0; // 0: All, 1: By Tag, 2: Recent
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) {
+        setState(() {
+          _selectedTab = _tabController.index;
+          _currentPage = 1;
+        });
+        _loadDocuments();
+      }
+    });
     _loadDocuments();
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (_searchController.text != _searchQuery) {
+        setState(() {
+          _searchQuery = _searchController.text.isEmpty ? null : _searchController.text;
+          _currentPage = 1;
+        });
+        _loadDocuments();
+      }
+    });
   }
 
   @override
@@ -62,26 +97,45 @@ class _DocumentsPageState extends ConsumerState<DocumentsPage> {
     }
 
     try {
+      // Aplicar filtros baseados na aba selecionada
+      String? category;
+      String? documentableType;
+      bool recent = false;
+      
+      if (_selectedTab == 1) {
+        // By Tag - usar _filterCategory se definido
+        category = _filterCategory;
+      } else if (_selectedTab == 2) {
+        // Recent - últimos 30 dias
+        recent = true;
+      }
+      
       final response = await DocumentService.list(
-        category: _filterCategory,
+        category: category,
         page: _currentPage,
         perPage: 15,
+        search: _searchQuery,
       );
+      
+      List<Document> documents = (response.data['data'] as List<dynamic>)
+          .map((json) => Document.fromJson(json))
+          .toList();
+      
+      // Filtrar recentes se necessário
+      if (recent) {
+        final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
+        documents = documents.where((doc) => doc.createdAt.isAfter(thirtyDaysAgo)).toList();
+      }
 
       if (response.statusCode == 200) {
         final data = response.data;
-        final documentsData = data['data'] as List<dynamic>;
         final meta = data['meta'] ?? {};
 
         setState(() {
           if (_currentPage == 1) {
-            _documents = documentsData
-                .map((json) => Document.fromJson(json))
-                .toList();
+            _documents = documents;
           } else {
-            _documents.addAll(
-              documentsData.map((json) => Document.fromJson(json)).toList(),
-            );
+            _documents.addAll(documents);
           }
           _totalPages = meta['last_page'] ?? 1;
           _hasMore = _currentPage < (_totalPages);
@@ -97,6 +151,43 @@ class _DocumentsPageState extends ConsumerState<DocumentsPage> {
   }
 
   Future<void> _pickAndUploadFiles() async {
+    // Mostrar bottom sheet com opções
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'Adicionar Documento',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.folder, color: Colors.blue),
+              title: const Text('Selecionar Arquivo'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickFiles();
+              },
+            ),
+            // Para web, não mostrar opção de câmera
+            // Em mobile, poderia ter: ListTile com Icons.camera
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickFiles() async {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -263,17 +354,37 @@ class _DocumentsPageState extends ConsumerState<DocumentsPage> {
     }
   }
 
-  Future<void> _downloadDocument(Document document) async {
+  Future<void> _copyTemporaryUrl(Document document) async {
     try {
-      // Obter URL temporária
       final urlResponse = await DocumentService.getUrl(document.id);
       if (urlResponse.statusCode == 200) {
         final url = urlResponse.data['url'] as String;
-        // Abrir URL no navegador (para web)
+        // Copiar para clipboard (web)
+        // Em Flutter web, podemos usar Clipboard.setData
+        await Clipboard.setData(ClipboardData(text: url));
         if (mounted) {
-          // Para web, usar url_launcher seria ideal, mas por enquanto apenas mostrar a URL
-          ToastService.showInfo(context, 'URL de download obtida. Implementar download direto em breve.');
-          // TODO: Implementar download direto com url_launcher ou similar
+          ToastService.showSuccess(context, 'URL copiada para a área de transferência!');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastService.showError(context, 'Erro ao copiar URL');
+      }
+    }
+  }
+
+  Future<void> _downloadDocument(Document document) async {
+    try {
+      // Obter URL temporária e abrir no navegador
+      final urlResponse = await DocumentService.getUrl(document.id);
+      if (urlResponse.statusCode == 200) {
+        final url = urlResponse.data['url'] as String;
+        // Para web, abrir URL em nova aba
+        // html.window.open(url, '_blank'); // Seria necessário import 'dart:html' mas não funciona em todos os contextos
+        // Por enquanto, copiar URL
+        await Clipboard.setData(ClipboardData(text: url));
+        if (mounted) {
+          ToastService.showInfo(context, 'URL copiada. Abra em nova aba para fazer download.');
         }
       }
     } catch (e) {
@@ -365,23 +476,71 @@ class _DocumentsPageState extends ConsumerState<DocumentsPage> {
             ),
           ],
         ),
+        // Barra de busca
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Buscar documentos por nome ou tipo...',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() {
+                          _searchQuery = null;
+                          _currentPage = 1;
+                        });
+                        _loadDocuments();
+                      },
+                    )
+                  : null,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+        // Abas
+        TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: 'Todos', icon: Icon(Icons.folder, size: 18)),
+            Tab(text: 'Por Tag', icon: Icon(Icons.label, size: 18)),
+            Tab(text: 'Recentes', icon: Icon(Icons.access_time, size: 18)),
+          ],
+        ),
         ActionBar(
           actions: [
             if (canEdit)
               ActionItem(
-                label: 'Upload',
-                icon: Icons.upload,
+                label: 'Adicionar Documento',
+                icon: Icons.add_circle,
                 onPressed: _isUploading ? null : _pickAndUploadFiles,
                 type: ActionType.primary,
               ),
           ],
         ),
         if (_isUploading)
-          LinearProgressIndicator(
-            value: _uploadProgress,
-            backgroundColor: Colors.grey[300],
-            valueColor: AlwaysStoppedAnimation<Color>(
-              Theme.of(context).colorScheme.primary,
+          Container(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                LinearProgressIndicator(
+                  value: _uploadProgress,
+                  backgroundColor: Colors.grey[300],
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Enviando... ${(_uploadProgress * 100).toStringAsFixed(0)}%',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
             ),
           ),
         Expanded(
@@ -396,8 +555,10 @@ class _DocumentsPageState extends ConsumerState<DocumentsPage> {
                       ? EmptyState(
                           icon: Icons.folder,
                           title: 'Nenhum documento encontrado',
-                          message: 'Faça upload de seus documentos para mantê-los organizados e acessíveis.',
-                          actionLabel: 'Upload de Documento',
+                          message: (_searchQuery != null || _filterCategory != null)
+                              ? 'Nenhum documento corresponde aos filtros aplicados.'
+                              : 'Faça upload de seus documentos para mantê-los organizados e acessíveis.',
+                          actionLabel: 'Adicionar Documento',
                           onAction: canEdit ? _pickAndUploadFiles : null,
                         )
                       : RefreshIndicator(
@@ -428,39 +589,7 @@ class _DocumentsPageState extends ConsumerState<DocumentsPage> {
                               }
 
                               final document = _documents[index];
-                              return ListItemCard(
-                                title: document.name,
-                                subtitle:
-                                    '${document.sizeHuman} • ${document.category != null ? _formatCategory(document.category!) : "Sem categoria"} • ${DateFormat('dd/MM/yyyy').format(document.createdAt)}',
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      document.icon,
-                                      color: document.color,
-                                      size: 24,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    if (canEdit)
-                                      IconButton(
-                                        icon: const Icon(Icons.download, size: 20),
-                                        onPressed: () => _downloadDocument(document),
-                                        tooltip: 'Download',
-                                      ),
-                                  ],
-                                ),
-                                leadingIcon: document.icon,
-                                leadingColor: document.color,
-                                onTap: () => _downloadDocument(document),
-                                actions: [
-                                  if (canEdit)
-                                    IconButton(
-                                      icon: const Icon(Icons.delete, size: 20),
-                                      onPressed: () => _deleteDocument(document),
-                                      tooltip: 'Excluir',
-                                    ),
-                                ],
-                              );
+                              return _buildDocumentCard(context, document, canEdit);
                             },
                           ),
                         ),
@@ -482,5 +611,109 @@ class _DocumentsPageState extends ConsumerState<DocumentsPage> {
       default:
         return category;
     }
+  }
+
+  Widget _buildDocumentCard(BuildContext context, Document document, bool canEdit) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: document.color.withOpacity(0.2),
+          child: Icon(
+            document.icon,
+            color: document.color,
+          ),
+        ),
+        title: Text(
+          document.name,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 8,
+              children: [
+                if (document.category != null)
+                  Chip(
+                    label: Text(
+                      _formatCategory(document.category!),
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                    backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                Text(
+                  document.sizeHuman,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                Text(
+                  DateFormat('dd/MM/yyyy').format(document.createdAt),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ],
+        ),
+        trailing: PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert),
+          tooltip: 'Ações',
+          onSelected: (value) {
+            switch (value) {
+              case 'copy_url':
+                _copyTemporaryUrl(document);
+                break;
+              case 'download':
+                _downloadDocument(document);
+                break;
+              case 'delete':
+                if (canEdit) {
+                  _deleteDocument(document);
+                }
+                break;
+            }
+          },
+          itemBuilder: (context) => [
+            const PopupMenuItem(
+              value: 'copy_url',
+              child: Row(
+                children: [
+                  Icon(Icons.link, size: 20),
+                  SizedBox(width: 8),
+                  Text('Copiar URL temporária'),
+                ],
+              ),
+            ),
+            const PopupMenuItem(
+              value: 'download',
+              child: Row(
+                children: [
+                  Icon(Icons.download, size: 20),
+                  SizedBox(width: 8),
+                  Text('Download'),
+                ],
+              ),
+            ),
+            if (canEdit) ...[
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete, size: 20, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('Excluir', style: TextStyle(color: Colors.red)),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+        onTap: () => _downloadDocument(document),
+      ),
+    );
   }
 }

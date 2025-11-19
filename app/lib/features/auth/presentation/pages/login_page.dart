@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 import '../../../../core/auth/auth_provider.dart';
+import '../../../../core/navigation/menu_catalog.dart';
 import '../../../../core/storage/storage_service.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../config/api_config.dart';
@@ -48,7 +49,19 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         // Obter primeira organização do usuário
         final organizations = user['organizations'] as List<dynamic>?;
         if (organizations != null && organizations.isNotEmpty) {
-          final orgId = organizations[0]['id'].toString();
+          final org = organizations[0] as Map<String, dynamic>;
+          final orgId = org['id'].toString();
+          
+          // Obter role da organização (pode vir como 'role' ou do pivot)
+          final orgRole = (org['role'] as String?) ?? 
+                         (org['pivot']?['org_role'] as String?) ?? 
+                         'user';
+          UserRole userRole = UserRole.user;
+          if (orgRole == 'owner') {
+            userRole = UserRole.owner;
+          } else if (orgRole == 'admin') {
+            userRole = UserRole.admin;
+          }
 
           // Salvar token e organization ID
           await StorageService.saveToken(token);
@@ -61,9 +74,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 password: _passwordController.text,
                 userId: user['id'].toString(),
                 organizationId: orgId,
-                organizationName: organizations[0]['name'] as String?,
+                organizationName: org['name'] as String?,
                 name: user['name'] as String?,
-                // TODO: Buscar role real da API depois
+                role: userRole,
               );
 
           if (!mounted) return;

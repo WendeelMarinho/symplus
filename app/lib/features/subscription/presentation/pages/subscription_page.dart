@@ -140,7 +140,21 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
                               // Card do Plano Atual
                               Card(
                                 elevation: 4,
-                                child: Padding(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(16),
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        _subscription!.planColor.withOpacity(0.1),
+                                        _subscription!.planColor.withOpacity(0.05),
+                                      ],
+                                    ),
+                                  ),
                                   padding: const EdgeInsets.all(24),
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -148,18 +162,22 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
                                       Row(
                                         children: [
                                           Container(
-                                            padding: const EdgeInsets.all(12),
+                                            padding: const EdgeInsets.all(16),
                                             decoration: BoxDecoration(
-                                              color: _subscription!.planColor.withOpacity(0.1),
-                                              borderRadius: BorderRadius.circular(12),
+                                              color: _subscription!.planColor.withOpacity(0.2),
+                                              borderRadius: BorderRadius.circular(16),
+                                              border: Border.all(
+                                                color: _subscription!.planColor.withOpacity(0.3),
+                                                width: 2,
+                                              ),
                                             ),
                                             child: Icon(
                                               Icons.card_membership,
                                               color: _subscription!.planColor,
-                                              size: 32,
+                                              size: 36,
                                             ),
                                           ),
-                                          const SizedBox(width: 16),
+                                          const SizedBox(width: 20),
                                           Expanded(
                                             child: Column(
                                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -168,26 +186,38 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
                                                   _subscription!.planName,
                                                   style: Theme.of(context)
                                                       .textTheme
-                                                      .headlineSmall
+                                                      .headlineMedium
                                                       ?.copyWith(
                                                         fontWeight: FontWeight.bold,
+                                                        color: _subscription!.planColor,
                                                       ),
                                                 ),
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  _subscription!.isActive
-                                                      ? 'Plano Ativo'
-                                                      : _subscription!.isOnTrial
-                                                          ? 'Período de Teste'
-                                                          : 'Plano Inativo',
-                                                  style: Theme.of(context)
-                                                      .textTheme
-                                                      .bodyMedium
-                                                      ?.copyWith(
-                                                        color: _subscription!.isActive
-                                                            ? Colors.green
-                                                            : Colors.orange,
-                                                      ),
+                                                const SizedBox(height: 8),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(
+                                                    horizontal: 12,
+                                                    vertical: 6,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color: _subscription!.isActive
+                                                        ? Colors.green
+                                                        : _subscription!.isOnTrial
+                                                            ? Colors.orange
+                                                            : Colors.grey,
+                                                    borderRadius: BorderRadius.circular(20),
+                                                  ),
+                                                  child: Text(
+                                                    _subscription!.isActive
+                                                        ? 'Plano Ativo'
+                                                        : _subscription!.isOnTrial
+                                                            ? 'Período de Teste'
+                                                            : 'Plano Inativo',
+                                                    style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
                                                 ),
                                               ],
                                             ),
@@ -248,39 +278,127 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
 
                               // Limites do Plano
                               Card(
+                                elevation: 3,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
                                 child: Padding(
-                                  padding: const EdgeInsets.all(16),
+                                  padding: const EdgeInsets.all(20),
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text(
-                                        'Limites do Plano',
-                                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                              fontWeight: FontWeight.bold,
-                                            ),
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.analytics,
+                                            color: Theme.of(context).colorScheme.primary,
+                                            size: 28,
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Text(
+                                            'Limites do Plano',
+                                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                          ),
+                                        ],
                                       ),
-                                      const SizedBox(height: 16),
+                                      const SizedBox(height: 20),
                                       ..._subscription!.planLimits.entries.map((entry) {
                                         final feature = entry.key;
                                         final limit = entry.value;
-                                        return Padding(
-                                          padding: const EdgeInsets.only(bottom: 12),
+                                        final icon = _getFeatureIcon(feature);
+                                        return Container(
+                                          margin: const EdgeInsets.only(bottom: 12),
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .surfaceContainerHighest
+                                                .withOpacity(0.5),
+                                            borderRadius: BorderRadius.circular(12),
+                                            border: Border.all(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .outline
+                                                  .withOpacity(0.2),
+                                            ),
+                                          ),
                                           child: Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                             children: [
-                                              Text(
-                                                _formatFeatureName(feature),
-                                                style: Theme.of(context).textTheme.bodyMedium,
+                                              Container(
+                                                padding: const EdgeInsets.all(10),
+                                                decoration: BoxDecoration(
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .primaryContainer,
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                                child: Icon(
+                                                  icon,
+                                                  color: Theme.of(context).colorScheme.primary,
+                                                  size: 24,
+                                                ),
                                               ),
-                                              Text(
-                                                limit == -1 ? 'Ilimitado' : limit.toString(),
-                                                style: Theme.of(context)
-                                                    .textTheme
-                                                    .bodyMedium
-                                                    ?.copyWith(
-                                                      fontWeight: FontWeight.bold,
-                                                      color: Theme.of(context).colorScheme.primary,
+                                              const SizedBox(width: 16),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      _formatFeatureName(feature),
+                                                      style: Theme.of(context)
+                                                          .textTheme
+                                                          .titleMedium
+                                                          ?.copyWith(
+                                                            fontWeight: FontWeight.w600,
+                                                          ),
                                                     ),
+                                                    const SizedBox(height: 4),
+                                                    Text(
+                                                      _getFeatureDescription(feature),
+                                                      style: Theme.of(context)
+                                                          .textTheme
+                                                          .bodySmall
+                                                          ?.copyWith(
+                                                            color: Theme.of(context)
+                                                                .colorScheme
+                                                                .onSurface
+                                                                .withOpacity(0.6),
+                                                          ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 16,
+                                                  vertical: 8,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: limit == -1
+                                                      ? Colors.green.withOpacity(0.1)
+                                                      : Theme.of(context)
+                                                          .colorScheme
+                                                          .primaryContainer,
+                                                  borderRadius: BorderRadius.circular(20),
+                                                ),
+                                                child: Text(
+                                                  limit == -1
+                                                      ? 'Ilimitado'
+                                                      : limit.toString(),
+                                                  style: Theme.of(context)
+                                                      .textTheme
+                                                      .titleMedium
+                                                      ?.copyWith(
+                                                        fontWeight: FontWeight.bold,
+                                                        color: limit == -1
+                                                            ? Colors.green.shade700
+                                                            : Theme.of(context)
+                                                                .colorScheme
+                                                                .onPrimaryContainer,
+                                                      ),
+                                                ),
                                               ),
                                             ],
                                           ),
@@ -292,48 +410,177 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
                               ),
                               const SizedBox(height: 16),
 
-                              // Botões de Ação
+                              // Card de Ações
                               if (canManage) ...[
-                                if (_subscription!.plan != 'enterprise')
-                                  FilledButton.icon(
-                                    onPressed: () => _upgradePlan(
-                                      _subscription!.plan == 'free'
-                                          ? 'basic'
-                                          : _subscription!.plan == 'basic'
-                                              ? 'premium'
-                                              : 'enterprise',
-                                    ),
-                                    icon: const Icon(Icons.upgrade),
-                                    label: const Text('Fazer Upgrade'),
-                                    style: FilledButton.styleFrom(
-                                      padding: const EdgeInsets.all(16),
+                                Card(
+                                  elevation: 3,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(20),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.settings,
+                                              color: Theme.of(context).colorScheme.primary,
+                                              size: 28,
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Text(
+                                              'Gerenciar Assinatura',
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .titleLarge
+                                                  ?.copyWith(
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 20),
+                                        if (_subscription!.plan != 'enterprise')
+                                          FilledButton.icon(
+                                            onPressed: () => _upgradePlan(
+                                              _subscription!.plan == 'free'
+                                                  ? 'basic'
+                                                  : _subscription!.plan == 'basic'
+                                                      ? 'premium'
+                                                      : 'enterprise',
+                                            ),
+                                            icon: const Icon(Icons.upgrade, size: 24),
+                                            label: Text(
+                                              _subscription!.plan == 'free'
+                                                  ? 'Fazer Upgrade para Básico'
+                                                  : _subscription!.plan == 'basic'
+                                                      ? 'Fazer Upgrade para Premium'
+                                                      : 'Fazer Upgrade para Empresarial',
+                                              style: const TextStyle(fontSize: 16),
+                                            ),
+                                            style: FilledButton.styleFrom(
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 24,
+                                                vertical: 18,
+                                              ),
+                                              minimumSize: const Size(double.infinity, 56),
+                                            ),
+                                          ),
+                                        if (_subscription!.plan != 'free' &&
+                                            _subscription!.isActive) ...[
+                                          const SizedBox(height: 12),
+                                          OutlinedButton.icon(
+                                            onPressed: _cancelSubscription,
+                                            icon: const Icon(Icons.cancel, size: 24),
+                                            label: const Text(
+                                              'Cancelar Assinatura',
+                                              style: TextStyle(fontSize: 16),
+                                            ),
+                                            style: OutlinedButton.styleFrom(
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 24,
+                                                vertical: 18,
+                                              ),
+                                              minimumSize: const Size(double.infinity, 56),
+                                              foregroundColor: Colors.red,
+                                              side: const BorderSide(color: Colors.red),
+                                            ),
+                                          ),
+                                        ],
+                                        const SizedBox(height: 12),
+                                        Container(
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .surfaceContainerHighest
+                                                .withOpacity(0.5),
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.info_outline,
+                                                color: Theme.of(context).colorScheme.primary,
+                                                size: 20,
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Text(
+                                                  'Para mais opções de gerenciamento, entre em contato com o suporte.',
+                                                  style: Theme.of(context)
+                                                      .textTheme
+                                                      .bodySmall
+                                                      ?.copyWith(
+                                                        color: Theme.of(context)
+                                                            .colorScheme
+                                                            .onSurface
+                                                            .withOpacity(0.7),
+                                                      ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                if (_subscription!.plan != 'free' && _subscription!.isActive)
-                                  const SizedBox(height: 8),
-                                if (_subscription!.plan != 'free' && _subscription!.isActive)
-                                  OutlinedButton.icon(
-                                    onPressed: _cancelSubscription,
-                                    icon: const Icon(Icons.cancel),
-                                    label: const Text('Cancelar Assinatura'),
-                                    style: OutlinedButton.styleFrom(
-                                      padding: const EdgeInsets.all(16),
-                                      foregroundColor: Colors.red,
-                                    ),
-                                  ),
+                                ),
                               ] else ...[
                                 Card(
-                                  color: Colors.blue.withOpacity(0.1),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16),
+                                  elevation: 3,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: Colors.blue.withOpacity(0.3),
+                                      ),
+                                    ),
+                                    padding: const EdgeInsets.all(20),
                                     child: Row(
                                       children: [
-                                        const Icon(Icons.info_outline, color: Colors.blue),
-                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            color: Colors.blue.withOpacity(0.2),
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: const Icon(
+                                            Icons.info_outline,
+                                            color: Colors.blue,
+                                            size: 28,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 16),
                                         Expanded(
-                                          child: Text(
-                                            'Apenas proprietários e administradores podem alterar o plano.',
-                                            style: TextStyle(color: Colors.blue[700]),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'Permissão Necessária',
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .titleMedium
+                                                    ?.copyWith(
+                                                      fontWeight: FontWeight.bold,
+                                                      color: Colors.blue.shade700,
+                                                    ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                'Apenas proprietários e administradores podem alterar o plano.',
+                                                style: TextStyle(
+                                                  color: Colors.blue.shade700,
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ],
@@ -367,4 +614,39 @@ class _SubscriptionPageState extends ConsumerState<SubscriptionPage> {
         }).join(' ');
     }
   }
+
+  IconData _getFeatureIcon(String feature) {
+    switch (feature) {
+      case 'accounts':
+        return Icons.account_balance_wallet;
+      case 'transactions':
+        return Icons.swap_horiz;
+      case 'documents':
+        return Icons.description;
+      case 'users':
+        return Icons.people;
+      case 'organizations':
+        return Icons.business;
+      default:
+        return Icons.check_circle;
+    }
+  }
+
+  String _getFeatureDescription(String feature) {
+    switch (feature) {
+      case 'accounts':
+        return 'Número máximo de contas financeiras';
+      case 'transactions':
+        return 'Número máximo de transações por mês';
+      case 'documents':
+        return 'Número máximo de documentos armazenados';
+      case 'users':
+        return 'Número máximo de usuários na organização';
+      case 'organizations':
+        return 'Número máximo de organizações';
+      default:
+        return 'Limite de uso';
+    }
+  }
 }
+

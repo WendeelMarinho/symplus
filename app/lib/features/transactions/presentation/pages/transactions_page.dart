@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:dio/dio.dart';
@@ -14,12 +15,17 @@ import '../../../../core/widgets/confirm_dialog.dart';
 import '../../../../core/auth/auth_provider.dart';
 import '../../../../core/rbac/permission_helper.dart';
 import '../../../../core/rbac/permissions_catalog.dart';
+import '../../../../core/providers/currency_provider.dart';
+import '../../../../core/utils/currency_formatter.dart';
 import '../../data/services/transaction_service.dart';
 import '../../data/models/transaction.dart';
 import '../../../accounts/data/services/account_service.dart';
 import '../../../accounts/data/models/account.dart';
 import '../../../categories/data/services/category_service.dart';
 import '../../../categories/data/models/category.dart';
+import '../../../documents/data/services/document_service.dart';
+import 'package:file_picker/file_picker.dart';
+import '../widgets/transaction_document_upload.dart';
 
 class TransactionsPage extends ConsumerStatefulWidget {
   const TransactionsPage({super.key});
@@ -39,6 +45,9 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
   int? _filterCategoryId;
   DateTime? _filterFrom;
   DateTime? _filterTo;
+  String? _searchQuery;
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _keyboardFocusNode = FocusNode();
   int _currentPage = 1;
   int _totalPages = 1;
   bool _hasMore = false;
@@ -47,6 +56,27 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
   void initState() {
     super.initState();
     _loadData();
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _keyboardFocusNode.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    // Debounce search
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (_searchController.text != _searchQuery) {
+        setState(() {
+          _searchQuery = _searchController.text.isEmpty ? null : _searchController.text;
+          _currentPage = 1;
+        });
+        _loadTransactions();
+      }
+    });
   }
 
   @override
@@ -116,6 +146,7 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
         categoryId: _filterCategoryId,
         from: _filterFrom?.toIso8601String().split('T')[0],
         to: _filterTo?.toIso8601String().split('T')[0],
+        search: _searchQuery,
         page: _currentPage,
       );
 
@@ -154,6 +185,7 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
     DateTime? selectedDate = DateTime.now();
     int? selectedAccountId;
     int? selectedCategoryId;
+    PlatformFile? selectedFile;
     final formKey = GlobalKey<FormState>();
 
     showDialog(
@@ -286,6 +318,15 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  // Upload de documento (obrigatório)
+                  TransactionDocumentUpload(
+                    required: true,
+                    onFileSelected: (file) {
+                      selectedFile = file;
+                      setDialogState(() {});
+                    },
+                  ),
                 ],
               ),
             ),
@@ -307,7 +348,8 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
               onPressed: () async {
                 if (formKey.currentState!.validate() &&
                     selectedAccountId != null &&
-                    selectedDate != null) {
+                    selectedDate != null &&
+                    selectedFile != null) {
                   // Salvar valores antes de fechar
                   final accountId = selectedAccountId!;
                   final categoryId = selectedCategoryId;
@@ -315,6 +357,7 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                   final amount = double.parse(amountController.text.replaceAll(',', '.'));
                   final occurredAt = selectedDate!;
                   final description = descriptionController.text;
+                  final file = selectedFile!;
                   
                   // Fechar diálogo primeiro
                   Navigator.of(context).pop();
@@ -332,6 +375,15 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                     amount: amount,
                     occurredAt: occurredAt,
                     description: description,
+                    file: file,
+                  );
+                } else if (selectedFile == null) {
+                  // Mostrar erro se arquivo não foi selecionado
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Por favor, selecione um documento'),
+                      backgroundColor: Colors.red,
+                    ),
                   );
                 }
               },
@@ -350,16 +402,49 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
     required double amount,
     required DateTime occurredAt,
     required String description,
+    required PlatformFile file,
   }) async {
     try {
-      await TransactionService.create(
+      // Primeiro, fazer upload do documento
+      final uploadResponse = await DocumentService.upload(
+        file: file,
+        name: file.name,
+        description: 'Documento da transação: $description',
+        category: 'transaction',
+        documentableType: 'transaction',
+      );
+
+      if (uploadResponse.statusCode != 201) {
+        throw Exception('Erro ao fazer upload do documento');
+      }
+
+      final documentData = uploadResponse.data['data'] as Map<String, dynamic>;
+      final documentPath = documentData['path'] as String?;
+
+      // Criar transação com o path do documento
+      final transactionResponse = await TransactionService.create(
         accountId: accountId,
         categoryId: categoryId,
         type: type,
         amount: amount,
         occurredAt: occurredAt,
         description: description,
+        attachmentPath: documentPath,
       );
+
+      // Associar documento à transação após criação
+      if (transactionResponse.statusCode == 201) {
+        final transactionData = transactionResponse.data['data'] as Map<String, dynamic>;
+        final transactionId = transactionData['id'] as int;
+        final documentId = documentData['id'] as int;
+
+        // Atualizar documento para associar à transação
+        await DocumentService.update(
+          documentId,
+          description: 'Documento da transação #$transactionId: $description',
+        );
+      }
+
       if (mounted) {
         ToastService.showSuccess(context, 'Transação criada com sucesso!');
         setState(() {
@@ -809,8 +894,8 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
     );
   }
 
-  String _formatCurrency(double value) {
-    return NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(value);
+  String _formatCurrency(double value, CurrencyState currencyState) {
+    return CurrencyFormatter.format(value, currencyState);
   }
 
   String _formatDate(DateTime date) {
@@ -828,9 +913,33 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
         _filterAccountId != null ||
         _filterCategoryId != null ||
         _filterFrom != null ||
-        _filterTo != null;
+        _filterTo != null ||
+        (_searchQuery?.isNotEmpty ?? false);
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
-    return Column(
+    return KeyboardListener(
+      focusNode: _keyboardFocusNode,
+      onKeyEvent: (event) {
+        if (event is KeyDownEvent) {
+          // Ctrl+N ou Cmd+N - Nova transação
+          if ((event.logicalKey == LogicalKeyboardKey.keyN) &&
+              (HardwareKeyboard.instance.isControlPressed ||
+                  HardwareKeyboard.instance.isMetaPressed)) {
+            if (canCreate) {
+              _showCreateDialog();
+            }
+          }
+          // Ctrl+F ou Cmd+F - Abrir filtros
+          else if ((event.logicalKey == LogicalKeyboardKey.keyF) &&
+              (HardwareKeyboard.instance.isControlPressed ||
+                  HardwareKeyboard.instance.isMetaPressed)) {
+            _showFilterDialog();
+          }
+        }
+      },
+      child: Focus(
+        autofocus: true,
+        child: Column(
       children: [
         PageHeader(
           title: 'Transações',
@@ -860,12 +969,39 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
             ),
           ],
         ),
+        // Barra de busca
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Buscar transações...',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() {
+                          _searchQuery = null;
+                          _currentPage = 1;
+                        });
+                        _loadTransactions();
+                      },
+                    )
+                  : null,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
         ActionBar(
           actions: [
             if (canCreate)
               ActionItem(
-                label: 'Nova Transação',
-                icon: Icons.add,
+                label: 'Adicionar Transação',
+                icon: Icons.add_circle,
                 onPressed: _showCreateDialog,
                 type: ActionType.primary,
               ),
@@ -883,7 +1019,9 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                       ? EmptyState(
                           icon: Icons.swap_horiz,
                           title: 'Nenhuma transação encontrada',
-                          message: 'Registre sua primeira transação para começar a acompanhar suas finanças.',
+                          message: hasFilters
+                              ? 'Nenhuma transação corresponde aos filtros aplicados.'
+                              : 'Registre sua primeira transação para começar a acompanhar suas finanças.',
                           actionLabel: 'Nova Transação',
                           onAction: canCreate ? _showCreateDialog : null,
                         )
@@ -894,67 +1032,382 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                             });
                             return _loadTransactions();
                           },
-                          child: ListView.builder(
-                            itemCount: _transactions.length + (_hasMore ? 1 : 0),
-                            itemBuilder: (context, index) {
-                              if (index == _transactions.length) {
-                                return Padding(
-                                  padding: const EdgeInsets.all(16.0),
-                                  child: Center(
-                                    child: TextButton(
-                                      onPressed: () {
-                                        setState(() {
-                                          _currentPage++;
-                                        });
-                                        _loadTransactions(showLoading: false);
-                                      },
-                                      child: const Text('Carregar mais'),
-                                    ),
-                                  ),
-                                );
-                              }
-
-                              final transaction = _transactions[index];
-                              return ListItemCard(
-                                title: transaction.description,
-                                subtitle:
-                                    '${transaction.accountName ?? "Sem conta"} • ${transaction.categoryName ?? "Sem categoria"} • ${_formatDate(transaction.occurredAt)}',
-                                trailing: Text(
-                                  _formatCurrency(transaction.amount),
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: transaction.type == 'income'
-                                        ? Colors.green
-                                        : Colors.red,
+                          child: isMobile
+                              ? ListView.builder(
+                                  itemCount: _transactions.length + (_hasMore ? 1 : 0),
+                                  itemBuilder: (context, index) {
+                                    if (index == _transactions.length) {
+                                      return Padding(
+                                        padding: const EdgeInsets.all(16.0),
+                                        child: Center(
+                                          child: TextButton(
+                                            onPressed: () {
+                                              setState(() {
+                                                _currentPage++;
+                                              });
+                                              _loadTransactions(showLoading: false);
+                                            },
+                                            child: const Text('Carregar mais'),
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                    return _buildTransactionItem(context, _transactions[index], canEdit, isMobile);
+                                  },
+                                )
+                              : SingleChildScrollView(
+                                  child: Column(
+                                    children: [
+                                      // Cabeçalho da tabela (desktop)
+                                      Card(
+                                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                        child: Table(
+                                          columnWidths: const {
+                                            0: FlexColumnWidth(0.5),
+                                            1: FlexColumnWidth(3),
+                                            2: FlexColumnWidth(1.5),
+                                            3: FlexColumnWidth(1.5),
+                                            4: FlexColumnWidth(1.5),
+                                            5: FlexColumnWidth(1),
+                                          },
+                                          children: [
+                                            TableRow(
+                                              children: [
+                                                const Padding(
+                                                  padding: EdgeInsets.all(12),
+                                                  child: Text('', style: TextStyle(fontWeight: FontWeight.bold)),
+                                                ),
+                                                const Padding(
+                                                  padding: EdgeInsets.all(12),
+                                                  child: Text('Descrição', style: TextStyle(fontWeight: FontWeight.bold)),
+                                                ),
+                                                const Padding(
+                                                  padding: EdgeInsets.all(12),
+                                                  child: Text('Conta', style: TextStyle(fontWeight: FontWeight.bold)),
+                                                ),
+                                                const Padding(
+                                                  padding: EdgeInsets.all(12),
+                                                  child: Text('Categoria', style: TextStyle(fontWeight: FontWeight.bold)),
+                                                ),
+                                                const Padding(
+                                                  padding: EdgeInsets.all(12),
+                                                  child: Text('Data', style: TextStyle(fontWeight: FontWeight.bold)),
+                                                ),
+                                                Padding(
+                                                  padding: const EdgeInsets.all(12),
+                                                  child: Text(
+                                                    'Valor',
+                                                    style: TextStyle(fontWeight: FontWeight.bold),
+                                                    textAlign: TextAlign.right,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      // Itens da tabela
+                                      ...List.generate(
+                                        _transactions.length,
+                                        (index) => _buildTransactionItem(context, _transactions[index], canEdit, isMobile),
+                                      ),
+                                      // Botão carregar mais
+                                      if (_hasMore)
+                                        Padding(
+                                          padding: const EdgeInsets.all(16.0),
+                                          child: Center(
+                                            child: TextButton(
+                                              onPressed: () {
+                                                setState(() {
+                                                  _currentPage++;
+                                                });
+                                                _loadTransactions(showLoading: false);
+                                              },
+                                              child: const Text('Carregar mais'),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                 ),
-                                leadingIcon: transaction.type == 'income'
-                                    ? Icons.arrow_downward
-                                    : Icons.arrow_upward,
-                                leadingColor: transaction.type == 'income'
-                                    ? Colors.green
-                                    : Colors.red,
-                                onTap: null,
-                                actions: [
-                                  if (canEdit)
-                                    IconButton(
-                                      icon: const Icon(Icons.edit, size: 20),
-                                      onPressed: () => _showEditDialog(transaction),
-                                      tooltip: 'Editar',
-                                    ),
-                                  if (canEdit)
-                                    IconButton(
-                                      icon: const Icon(Icons.delete, size: 20),
-                                      onPressed: () => _deleteTransaction(transaction),
-                                      tooltip: 'Excluir',
-                                    ),
-                                ],
-                              );
-                            },
-                          ),
                         ),
         ),
       ],
+        ),
+      ),
     );
+  }
+
+  Widget _buildTransactionItem(BuildContext context, Transaction transaction, bool canEdit, bool isMobile) {
+    if (isMobile) {
+      return Card(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: ListTile(
+          onTap: () {
+            context.go('/app/transactions/${transaction.id}');
+          },
+          leading: CircleAvatar(
+            backgroundColor: transaction.type == 'income'
+                ? Colors.green.shade100
+                : Colors.red.shade100,
+            child: Icon(
+              transaction.type == 'income'
+                  ? Icons.arrow_downward
+                  : Icons.arrow_upward,
+              color: transaction.type == 'income'
+                  ? Colors.green.shade700
+                  : Colors.red.shade700,
+            ),
+          ),
+          title: Text(
+            transaction.description,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 8,
+                children: [
+                  Chip(
+                    label: Text(
+                      transaction.type == 'income' ? 'Receita' : 'Despesa',
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                    backgroundColor: transaction.type == 'income'
+                        ? Colors.green.shade50
+                        : Colors.red.shade50,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  if (transaction.accountName != null)
+                    Text(
+                      transaction.accountName!,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  Text(
+                    _formatDate(transaction.occurredAt),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ],
+          ),
+          trailing: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Consumer(
+                builder: (context, ref, child) {
+                  final currencyState = ref.watch(currencyProvider);
+                  return Text(
+                    _formatCurrency(transaction.amount, currencyState),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: transaction.type == 'income'
+                          ? Colors.green.shade700
+                          : Colors.red.shade700,
+                    ),
+                  );
+                },
+              ),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, size: 18),
+                onSelected: (value) {
+                  if (value == 'edit' && canEdit) {
+                    _showEditDialog(transaction);
+                  } else if (value == 'delete' && canEdit) {
+                    _deleteTransaction(transaction);
+                  }
+                },
+                itemBuilder: (context) => [
+                  if (canEdit)
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, size: 20),
+                          SizedBox(width: 8),
+                          Text('Editar'),
+                        ],
+                      ),
+                    ),
+                  if (canEdit)
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, size: 20, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Excluir', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    } else {
+      // Desktop: tabela
+      return Card(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: InkWell(
+          onTap: () {
+            context.go('/app/transactions/${transaction.id}');
+          },
+          borderRadius: BorderRadius.circular(8),
+          child: Table(
+          columnWidths: const {
+            0: FlexColumnWidth(0.5),
+            1: FlexColumnWidth(3),
+            2: FlexColumnWidth(1.5),
+            3: FlexColumnWidth(1.5),
+            4: FlexColumnWidth(1.5),
+            5: FlexColumnWidth(1),
+          },
+          children: [
+            TableRow(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: CircleAvatar(
+                    radius: 16,
+                    backgroundColor: transaction.type == 'income'
+                        ? Colors.green.shade100
+                        : Colors.red.shade100,
+                    child: Icon(
+                      transaction.type == 'income'
+                          ? Icons.arrow_downward
+                          : Icons.arrow_upward,
+                      size: 18,
+                      color: transaction.type == 'income'
+                          ? Colors.green.shade700
+                          : Colors.red.shade700,
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        transaction.description,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                      const SizedBox(height: 4),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          Chip(
+                            label: Text(
+                              transaction.type == 'income' ? 'Receita' : 'Despesa',
+                              style: const TextStyle(fontSize: 10),
+                            ),
+                            backgroundColor: transaction.type == 'income'
+                                ? Colors.green.shade50
+                                : Colors.red.shade50,
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    transaction.accountName ?? 'Sem conta',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    transaction.categoryName ?? 'Sem categoria',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    _formatDate(transaction.occurredAt),
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Consumer(
+                        builder: (context, ref, child) {
+                          final currencyState = ref.watch(currencyProvider);
+                          return Text(
+                            _formatCurrency(transaction.amount, currencyState),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: transaction.type == 'income'
+                                  ? Colors.green.shade700
+                                  : Colors.red.shade700,
+                            ),
+                            textAlign: TextAlign.right,
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert, size: 18),
+                        onSelected: (value) {
+                          if (value == 'edit' && canEdit) {
+                            _showEditDialog(transaction);
+                          } else if (value == 'delete' && canEdit) {
+                            _deleteTransaction(transaction);
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          if (canEdit)
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.edit, size: 20),
+                                  SizedBox(width: 8),
+                                  Text('Editar'),
+                                ],
+                              ),
+                            ),
+                          if (canEdit)
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.delete, size: 20, color: Colors.red),
+                                  SizedBox(width: 8),
+                                  Text('Excluir', style: TextStyle(color: Colors.red)),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+          ),
+        ),
+      );
+    }
   }
 }

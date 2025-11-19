@@ -6,17 +6,26 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/widgets/page_header.dart';
 import '../../../../core/widgets/action_bar.dart';
 import '../../../../core/widgets/toast_service.dart';
+import '../../../../core/widgets/period_filter.dart';
+import '../../../../core/widgets/user_avatar.dart';
 import '../../../../core/auth/auth_provider.dart';
 import '../../../../core/rbac/rbac_helper.dart';
 import '../../../../core/rbac/permission_helper.dart';
 import '../../../../core/rbac/permissions_catalog.dart';
 import '../../../../core/accessibility/responsive_utils.dart';
 import '../../../../core/accessibility/telemetry_service.dart';
+import '../../../../core/providers/period_filter_provider.dart';
+import '../../../../core/providers/currency_provider.dart';
+import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/l10n/app_localizations.dart';
 import '../../data/models/dashboard_data.dart';
 import '../../data/services/dashboard_service.dart';
 import '../widgets/kpi_card.dart';
+import '../widgets/kpi_main_card.dart';
+import '../widgets/quarterly_summary.dart';
 import '../widgets/dashboard_charts.dart';
 import '../widgets/due_items_calendar.dart';
+import '../../../custom_indicators/presentation/widgets/custom_indicators_section.dart';
 import '../../../../core/widgets/list_item_card.dart';
 import '../../../../core/widgets/confirm_dialog.dart';
 import '../../../due_items/data/services/due_item_service.dart';
@@ -59,7 +68,16 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     });
 
     try {
-      final data = await DashboardService.getDashboard();
+      // Obter período atual do filtro
+      final periodState = ref.read(periodFilterProvider);
+      final dates = periodState.dates;
+
+      // Buscar dados do dashboard com filtro de período
+      final data = await DashboardService.getDashboard(
+        from: dates.from.toIso8601String().split('T')[0],
+        to: dates.to.toIso8601String().split('T')[0],
+      );
+      
       setState(() {
         _data = data;
         _isLoading = false;
@@ -74,8 +92,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     }
   }
 
-  String _formatCurrency(double value) {
-    return NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(value);
+  String _formatCurrency(double value, CurrencyState currencyState) {
+    return CurrencyFormatter.format(value, currencyState);
   }
 
   String _formatDate(String dateStr) {
@@ -238,6 +256,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    final currencyState = ref.watch(currencyProvider);
     final canCreateTransaction = PermissionHelper.hasPermission(authState, Permission.transactionsCreate);
     final canCreateCategory = PermissionHelper.hasPermission(authState, Permission.categoriesCreate);
     final canUploadDocument = PermissionHelper.hasPermission(authState, Permission.documentsUpload);
@@ -306,13 +325,12 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
       },
       child: Focus(
         autofocus: true,
-        child: Column(
-          children: [
-            PageHeader(
-              title: 'Dashboard',
-              subtitle: 'Visão geral das suas finanças',
-              breadcrumbs: const ['Início'],
-            ),
+        child: _PeriodFilterListener(
+          onPeriodChanged: () => _loadDashboard(),
+          child: Column(
+            children: [
+              // Header com contexto (organização + período)
+              _buildDashboardHeader(context, authState, isMobile),
             // Quick Actions na ActionBar
             ActionBar(
               actions: [
@@ -386,41 +404,52 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        // Badge de Overdue
-                                        if (_data!.overdueItems.isNotEmpty) ...[
-                                          _buildOverdueBadge(),
-                                          SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
-                                        ],
-                                        // KPIs Visuais
+                                        // ORDEM ESPECIFICADA:
+                                        // 1. Filtro de Período (global - topo) - já está no PageHeader ✅
+                                        
+                                        // 2. 4 KPIs principais
                                         _buildKpiCards(),
                                         SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
-                                        // Resumo do Período (apenas se tiver permissão de ver relatórios)
-                                        if (canViewReports) ...[
-                                          _buildPeriodSummary(),
-                                          SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
-                                        ],
-                                        // Gráficos (apenas se tiver permissão de ver transações ou relatórios)
+                                        
+                                        // 3. Indicadores Personalizados
+                                        const CustomIndicatorsSection(),
+                                        SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
+                                        
+                                        // 4. Resumo Trimestral
+                                        const QuarterlySummary(),
+                                        SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
+                                        
+                                        // 5. Gráficos (Entrada/Saída por categoria)
                                         if (canViewTransactions || canViewReports) ...[
                                           _buildChartsSection(),
                                           SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
                                         ],
-                                        // Transações Recentes
-                                        if (canViewTransactions) ...[
-                                          _buildRecentTransactions(),
-                                          SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
-                                        ],
-                                        // Próximos Vencimentos
-                                        if (canViewDueItems && _data!.upcomingDueItems.isNotEmpty) ...[
-                                          _buildUpcomingDueItems(canMarkPaid),
-                                          SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
-                                        ],
-                                        // Calendário
+                                        
+                                        // 6. Calendário com transações
                                         if (canViewDueItems) ...[
                                           _buildDueItemsCalendar(),
                                           SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
                                         ],
-                                        SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
-                                        // Saldos das Contas
+                                        
+                                        // 7. Quick Actions (já está na ActionBar acima) ✅
+                                        
+                                        // Seções adicionais (opcionais, mantidas para contexto)
+                                        // Badge de Overdue (alerta importante)
+                                        if (_data!.overdueItems.isNotEmpty) ...[
+                                          _buildOverdueBadge(),
+                                          SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
+                                        ],
+                                        // Transações Recentes (contexto adicional)
+                                        if (canViewTransactions) ...[
+                                          _buildRecentTransactions(),
+                                          SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
+                                        ],
+                                        // Próximos Vencimentos (contexto adicional)
+                                        if (canViewDueItems && _data!.upcomingDueItems.isNotEmpty) ...[
+                                          _buildUpcomingDueItems(canMarkPaid),
+                                          SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
+                                        ],
+                                        // Saldos das Contas (contexto adicional)
                                         _buildAccountBalances(),
                                       ],
                                     ),
@@ -437,114 +466,188 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     );
   }
 
+  /// Constrói o header do dashboard com contexto da organização
+  Widget _buildDashboardHeader(BuildContext context, AuthState authState, bool isMobile) {
+    // Determinar nome a exibir (organização ou usuário)
+    final displayName = authState.organizationName ?? authState.name ?? authState.userName ?? 'Usuário';
+    final isCompany = authState.organizationName != null && authState.organizationName!.isNotEmpty;
+    
+    return Container(
+      padding: EdgeInsets.all(isMobile ? 16.0 : 20.0),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(
+          bottom: BorderSide(
+            color: Theme.of(context).dividerColor,
+            width: 1,
+          ),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Linha 1: Nome da organização/usuário + Avatar
+          Row(
+            children: [
+              // Avatar
+              Consumer(
+                builder: (context, ref, child) {
+                  return UserAvatar(
+                    radius: isMobile ? 24 : 32,
+                    onTap: () => context.go('/app/profile'),
+                  );
+                },
+              ),
+              const SizedBox(width: 12),
+              // Nome
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      displayName,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (authState.userName != null && isCompany)
+                      Text(
+                        authState.userName!,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                            ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+              ),
+              // Filtro de período
+              const PeriodFilter(),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Linha 2: Título do dashboard
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.t('dashboard.title'),
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    if (context.t('dashboard.subtitle').isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        context.t('dashboard.subtitle'),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                            ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildKpiCards() {
     final summary = _data!.financialSummary;
+    final isMobile = ResponsiveUtils.isMobile(context);
+    final periodState = ref.watch(periodFilterProvider);
+    final dates = periodState.dates;
     
-    // Calcular variação (simulado - usar dados do período anterior se disponível)
-    final previousIncome = summary.income * 0.9; // Simulado
-    final previousExpense = summary.expenses * 1.1; // Simulado
-    final previousNet = summary.net * 0.8; // Simulado
+    // Calcular período anterior (mesma duração, mas antes)
+    final periodDuration = dates.to.difference(dates.from).inDays;
+    final previousFrom = dates.from.subtract(Duration(days: periodDuration + 1));
+    final previousTo = dates.from.subtract(const Duration(days: 1));
+    
+    // Calcular valores do período anterior baseado em estimativa
+    // TODO: Quando o backend fornecer dados do período anterior, usar valores reais
+    // Por enquanto, usamos uma estimativa baseada no período atual
+    final previousIncome = summary.income * 0.9;
+    final previousExpense = summary.expenses * 1.1;
+    final previousNet = summary.net * 0.8;
+    
+    // Calcular percentual (margem de lucro)
+    final percentage = summary.income > 0 
+        ? (summary.net / summary.income * 100) 
+        : 0.0;
+    final previousPercentage = previousIncome > 0 
+        ? (previousNet / previousIncome * 100) 
+        : 0.0;
 
-    // Sparkline data (últimos 6 meses)
-    final sparklineData = _data!.monthlyIncomeExpense.map((m) => m.net).toList();
+    if (isMobile) {
+      // Mobile: cards em lista vertical
+      return Column(
+        children: [
+          KpiMainCard(
+            type: KpiType.income,
+            value: summary.income,
+            previousValue: previousIncome,
+          ),
+          const SizedBox(height: 16),
+          KpiMainCard(
+            type: KpiType.expense,
+            value: summary.expenses,
+            previousValue: previousExpense,
+          ),
+          const SizedBox(height: 16),
+          KpiMainCard(
+            type: KpiType.net,
+            value: summary.net,
+            previousValue: previousNet,
+          ),
+          const SizedBox(height: 16),
+          KpiMainCard(
+            type: KpiType.percentage,
+            value: percentage,
+            previousValue: previousPercentage,
+          ),
+        ],
+      );
+    }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isMobile = ResponsiveUtils.isMobile(context);
-        final crossAxisCount = isMobile ? 1 : 3;
-
-        if (isMobile) {
-          return SizedBox(
-            height: 200,
-            child: PageView.builder(
-              itemCount: 3,
-              itemBuilder: (context, index) {
-                switch (index) {
-                  case 0:
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: KpiCard(
-                        title: 'Total Revenue',
-                        value: summary.income,
-                        previousValue: previousIncome,
-                        color: Colors.green,
-                        icon: Icons.trending_up,
-                        sparklineData: _data!.monthlyIncomeExpense.map((m) => m.income).toList(),
-                        onTap: _navigateToPlReport,
-                      ),
-                    );
-                  case 1:
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: KpiCard(
-                        title: 'Total Expense',
-                        value: summary.expenses,
-                        previousValue: previousExpense,
-                        color: Colors.red,
-                        icon: Icons.trending_down,
-                        sparklineData: _data!.monthlyIncomeExpense.map((m) => m.expenses).toList(),
-                        onTap: _navigateToPlReport,
-                      ),
-                    );
-                  case 2:
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: KpiCard(
-                        title: 'Net Result',
-                        value: summary.net,
-                        previousValue: previousNet,
-                        color: summary.net >= 0 ? Colors.green : Colors.red,
-                        icon: Icons.account_balance,
-                        sparklineData: sparklineData,
-                        onTap: _navigateToPlReport,
-                      ),
-                    );
-                  default:
-                    return const SizedBox.shrink();
-                }
-              },
-            ),
-          );
-        }
-
-        return GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: crossAxisCount,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: 1.5,
-          children: [
-            KpiCard(
-              title: 'Total Revenue',
-              value: summary.income,
-              previousValue: previousIncome,
-              color: Colors.green,
-              icon: Icons.trending_up,
-              sparklineData: _data!.monthlyIncomeExpense.map((m) => m.income).toList(),
-              onTap: _navigateToPlReport,
-            ),
-            KpiCard(
-              title: 'Total Expense',
-              value: summary.expenses,
-              previousValue: previousExpense,
-              color: Colors.red,
-              icon: Icons.trending_down,
-              sparklineData: _data!.monthlyIncomeExpense.map((m) => m.expenses).toList(),
-              onTap: _navigateToPlReport,
-            ),
-            KpiCard(
-              title: 'Net Result',
-              value: summary.net,
-              previousValue: previousNet,
-              color: summary.net >= 0 ? Colors.green : Colors.red,
-              icon: Icons.account_balance,
-              sparklineData: sparklineData,
-              onTap: _navigateToPlReport,
-            ),
-          ],
-        );
-      },
+    // Desktop/Tablet: grid 2x2
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 2,
+      crossAxisSpacing: 16,
+      mainAxisSpacing: 16,
+      childAspectRatio: 1.5,
+      children: [
+        KpiMainCard(
+          type: KpiType.income,
+          value: summary.income,
+          previousValue: previousIncome,
+        ),
+        KpiMainCard(
+          type: KpiType.expense,
+          value: summary.expenses,
+          previousValue: previousExpense,
+        ),
+        KpiMainCard(
+          type: KpiType.net,
+          value: summary.net,
+          previousValue: previousNet,
+        ),
+        KpiMainCard(
+          type: KpiType.percentage,
+          value: percentage,
+          previousValue: previousPercentage,
+        ),
+      ],
     );
   }
 
@@ -552,30 +655,61 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     final summary = _data!.financialSummary;
     final fromDate = DateTime.parse(summary.period.from);
     final toDate = DateTime.parse(summary.period.to);
+    final netProfit = summary.net;
+    final profitMargin = summary.income > 0 ? (netProfit / summary.income * 100) : 0.0;
 
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+      elevation: 3,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Theme.of(context).colorScheme.primaryContainer,
+              Theme.of(context).colorScheme.surface,
+            ],
+          ),
+        ),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Resumo do Período',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.analytics,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Resumo do Período',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                    ),
+                  ],
                 ),
-                TextButton.icon(
+                FilledButton.icon(
                   onPressed: _navigateToPlReport,
-                  icon: const Icon(Icons.bar_chart, size: 16),
-                  label: const Text('Ver P&L deste período'),
+                  icon: const Icon(Icons.bar_chart, size: 18),
+                  label: const Text('Ver P&L Completo'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
             Text(
               () {
                 try {
@@ -584,9 +718,54 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                   return '${DateFormat('dd/MM/yyyy').format(fromDate)} - ${DateFormat('dd/MM/yyyy').format(toDate)}';
                 }
               }(),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                   ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildSummaryCard(
+                    'Receitas',
+                    summary.income,
+                    Colors.green,
+                    Icons.trending_up,
+                    currencyState: currencyState,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildSummaryCard(
+                    'Despesas',
+                    summary.expenses,
+                    Colors.red,
+                    Icons.trending_down,
+                    currencyState: currencyState,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildSummaryCard(
+                    'Lucro Líquido',
+                    netProfit,
+                    netProfit >= 0 ? Colors.green : Colors.red,
+                    Icons.account_balance,
+                    currencyState: currencyState,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildSummaryCard(
+                    'Margem',
+                    profitMargin,
+                    profitMargin >= 0 ? Colors.green : Colors.red,
+                    Icons.percent,
+                    isPercentage: true,
+                    currencyState: currencyState,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -594,8 +773,51 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     );
   }
 
+  Widget _buildSummaryCard(String label, double value, Color color, IconData icon, {bool isPercentage = false, required CurrencyState currencyState}) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withOpacity(0.3),
+          width: 1.5,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 20, color: color),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                      fontWeight: FontWeight.w500,
+                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            isPercentage
+                ? '${value.toStringAsFixed(1)}%'
+                : _formatCurrency(value, currencyState),
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildChartsSection() {
     final isMobile = ResponsiveUtils.isMobile(context);
+    final periodState = ref.watch(periodFilterProvider);
 
     if (isMobile) {
       return Column(
@@ -607,11 +829,26 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Receitas x Despesas (6 meses)',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Receitas x Despesas',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
                         ),
+                      ),
+                      Tooltip(
+                        message: 'Período: ${periodState.displayLabel}',
+                        child: Icon(
+                          Icons.info_outline,
+                          size: 18,
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   SizedBox(
@@ -626,18 +863,83 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             ),
           ),
           const SizedBox(height: 16),
-          // Donut Chart - Top 5 Categorias
+          // Donut Chart - Receitas por Categoria
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Top 5 Categorias de Despesa',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Receitas por Categoria',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
                         ),
+                      ),
+                      Tooltip(
+                        message: 'Período: ${periodState.displayLabel}',
+                        child: Icon(
+                          Icons.info_outline,
+                          size: 18,
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: 250,
+                    child: TopCategoriesDonutChart(
+                      categories: _data!.topCategories.income.take(5).toList(),
+                      onSliceTap: (categoryId) {
+                        final now = DateTime.now();
+                        final start = DateTime(now.year, now.month - 2, 1);
+                        final end = DateTime(now.year, now.month + 1, 0);
+                        final uri = Uri.parse(
+                          '/app/transactions?type=income&categoryId=$categoryId&from=${start.toIso8601String().split('T')[0]}&to=${end.toIso8601String().split('T')[0]}',
+                        );
+                        TelemetryService.logAction('dashboard.chart.donut.income.clicked', metadata: {'category_id': categoryId.toString()});
+                        context.go(uri.toString());
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Donut Chart - Despesas por Categoria
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Despesas por Categoria',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                      ),
+                      Tooltip(
+                        message: 'Período: ${periodState.displayLabel}',
+                        child: Icon(
+                          Icons.info_outline,
+                          size: 18,
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   SizedBox(
@@ -662,20 +964,46 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         Expanded(
           flex: 2,
           child: Card(
+            elevation: 3,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Receitas x Despesas (6 meses)',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.bar_chart,
+                            color: Theme.of(context).colorScheme.primary,
+                            size: 24,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Receitas x Despesas',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          ),
+                        ],
+                      ),
+                      Tooltip(
+                        message: 'Período: ${periodState.displayLabel}',
+                        child: Icon(
+                          Icons.info_outline,
+                          size: 18,
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                         ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    height: 250,
+                  const SizedBox(height: 20),
+                  Expanded(
                     child: IncomeExpenseBarChart(
                       data: _data!.monthlyIncomeExpense,
                       onBarTap: _navigateToTransactionsMonth,
@@ -687,32 +1015,102 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
           ),
         ),
         const SizedBox(width: 16),
-        // Donut Chart - Top 5 Categorias
+        // Donut Charts - Receitas e Despesas por Categoria
         Expanded(
           flex: 1,
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Top 5 Categorias de Despesa',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+          child: Column(
+            children: [
+              // Donut Chart - Receitas por Categoria
+              Expanded(
+                child: Card(
+                  elevation: 3,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    height: 250,
-                    child: TopCategoriesDonutChart(
-                      categories: _data!.topCategories.expenses.take(5).toList(),
-                      onSliceTap: _navigateToTransactionsCategory,
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.pie_chart,
+                              color: Colors.green,
+                              size: 24,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Receitas por Categoria',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Expanded(
+                          child: TopCategoriesDonutChart(
+                            categories: _data!.topCategories.income.take(5).toList(),
+                            onSliceTap: (categoryId) {
+                              final now = DateTime.now();
+                              final start = DateTime(now.year, now.month - 2, 1);
+                              final end = DateTime(now.year, now.month + 1, 0);
+                              final uri = Uri.parse(
+                                '/app/transactions?type=income&categoryId=$categoryId&from=${start.toIso8601String().split('T')[0]}&to=${end.toIso8601String().split('T')[0]}',
+                              );
+                              TelemetryService.logAction('dashboard.chart.donut.income.clicked', metadata: {'category_id': categoryId.toString()});
+                              context.go(uri.toString());
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
+              const SizedBox(height: 16),
+              // Donut Chart - Despesas por Categoria
+              Expanded(
+                child: Card(
+                  elevation: 3,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.pie_chart,
+                              color: Colors.red,
+                              size: 24,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Despesas por Categoria',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Expanded(
+                          child: TopCategoriesDonutChart(
+                            categories: _data!.topCategories.expenses.take(5).toList(),
+                            onSliceTap: _navigateToTransactionsCategory,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -768,7 +1166,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                   subtitle:
                       '${transaction.account?.name ?? "Sem conta"} • ${_formatDate(transaction.occurredAt)}',
                   trailing: Text(
-                    _formatCurrency(transaction.amount),
+                    _formatCurrency(transaction.amount, currencyState),
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: _getAmountColor(transaction.amount, transaction.type),
@@ -839,7 +1237,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        _formatCurrency(item.amount),
+                        _formatCurrency(item.amount, currencyState),
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: _getAmountColor(item.amount, item.type),
@@ -885,14 +1283,23 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   }
 
   Widget _buildDueItemsCalendar() {
+    // Filtrar due items pelo período atual
+    final periodState = ref.watch(periodFilterProvider);
+    final dates = periodState.dates;
+    
     final allDueItems = [
       ..._data!.overdueItems,
       ..._data!.upcomingDueItems,
-    ];
+    ].where((item) {
+      final dueDate = DateTime.parse(item.dueDate);
+      return dueDate.isAfter(dates.from.subtract(const Duration(days: 1))) &&
+          dueDate.isBefore(dates.to.add(const Duration(days: 1)));
+    }).toList();
 
     return DueItemsCalendar(
       dueItems: allDueItems,
-      onDateTap: _navigateToDueItemsDate,
+      transactions: _data!.recentTransactions, // Incluir transações no calendário
+      // onDateTap removido - o calendário agora usa modal por padrão
     );
   }
 
@@ -951,7 +1358,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                   title: account.name,
                   subtitle: 'Conta',
                   trailing: Text(
-                    _formatCurrency(account.balance),
+                    _formatCurrency(account.balance, currencyState),
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: account.balance >= 0 ? Colors.green : Colors.red,
@@ -1011,7 +1418,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Total: ${_formatCurrency(total)}',
+                    'Total: ${_formatCurrency(total, currencyState)}',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: Colors.red.shade700,
                         ),
@@ -1172,3 +1579,4 @@ class _QuickActionMenuItem extends StatelessWidget {
     );
   }
 }
+

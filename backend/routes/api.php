@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CategoryController;
+use App\Http\Controllers\Api\CustomIndicatorController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\DueItemController;
@@ -17,9 +18,9 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/health', function () {
     return response()->json([
-        'status' => 'ok',
-        'timestamp' => now()->toIso8601String(),
-    ]);
+        'ok' => true,
+        'ts' => now()->toIso8601String(),
+    ], 200);
 });
 
 // Auth routes (public)
@@ -39,6 +40,7 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
     Route::apiResource('accounts', AccountController::class);
     Route::apiResource('categories', CategoryController::class);
     Route::apiResource('transactions', TransactionController::class);
+    Route::apiResource('custom-indicators', CustomIndicatorController::class);
 
     // Due items
     Route::apiResource('due-items', DueItemController::class);
