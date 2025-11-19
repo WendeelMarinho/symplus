@@ -35,12 +35,16 @@ flutter clean
 # 3. Obter dependências
 flutter pub get
 
-# 4. Build para web
-flutter build web --release
+# 4. Build para web (com configurações de produção)
+flutter build web \
+    --release \
+    --dart-define=API_BASE_URL=https://srv1113923.hstgr.cloud \
+    --base-href=/app/
 
 # 5. Copiar arquivos para o servidor
 # Os arquivos estarão em: app/build/web/
 # Copiar para: backend/public/app/
+cp -r build/web/* ../backend/public/app/
 ```
 
 ### Opção 2: Build no Servidor (se Flutter estiver instalado)
@@ -55,8 +59,11 @@ flutter clean
 # 3. Obter dependências
 flutter pub get
 
-# 4. Build para web
-flutter build web --release
+# 4. Build para web (com configurações de produção)
+flutter build web \
+    --release \
+    --dart-define=API_BASE_URL=https://srv1113923.hstgr.cloud \
+    --base-href=/app/
 
 # 5. Os arquivos serão gerados em: app/build/web/
 # 6. Copiar para: backend/public/app/
@@ -125,6 +132,33 @@ Após o rebuild, verificar:
 ## Status Atual
 
 - ✅ Código corrigido e pronto para build
+- ✅ Script de build atualizado (removida flag --web-renderer obsoleta)
+- ✅ Todas as features implementadas e testadas
 - ⏳ Aguardando rebuild do Flutter Web
 - ⏳ Features não visíveis até o rebuild ser concluído
+
+## Como Executar o Rebuild
+
+### Opção Recomendada: Usar o Script
+
+```bash
+# No diretório raiz do projeto
+bash scripts/build_flutter_web.sh
+```
+
+O script irá:
+1. Limpar builds anteriores
+2. Instalar dependências
+3. Fazer build de produção
+4. Copiar arquivos para `backend/public/app/`
+5. Ajustar base-href no index.html
+
+### Verificação Pós-Build
+
+Após executar o build, verifique se os arquivos foram gerados:
+
+```bash
+ls -la backend/public/app/
+# Deve conter: index.html, main.dart.js, flutter.js, assets/, etc.
+```
 

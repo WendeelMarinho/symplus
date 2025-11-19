@@ -11,6 +11,7 @@ import '../../../../core/accessibility/telemetry_service.dart';
 import '../../../../core/accessibility/responsive_utils.dart';
 import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/services/avatar_service.dart';
+import '../../../../core/auth/auth_provider.dart';
 import 'package:file_picker/file_picker.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
@@ -59,7 +60,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         allowedExtensions: ['png', 'jpg', 'jpeg', 'webp'],
       );
 
-      if (result != null && result.files.single.path != null || result.files.single.bytes != null) {
+      if (result != null && result.files.isNotEmpty && (result.files.single.path != null || result.files.single.bytes != null)) {
         final file = result.files.single;
         
         // Validar tamanho (5MB)

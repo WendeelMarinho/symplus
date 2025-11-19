@@ -74,7 +74,7 @@ class CustomIndicatorsSection extends ConsumerWidget {
     WidgetRef ref,
     indicator,
   ) async {
-    final confirmed = await showConfirmDialog(
+    final confirmed = await ConfirmDialog.show(
       context,
       title: 'Excluir Indicador',
       message: 'Deseja realmente excluir o indicador "${indicator.name}"?',
@@ -150,7 +150,7 @@ class CustomIndicatorsSection extends ConsumerWidget {
           const LoadingState()
         else if (state.error != null)
           ErrorState(
-            error: state.error!,
+            message: state.error!,
             onRetry: () => ref.read(customIndicatorsProvider.notifier).load(),
           )
         else if (state.indicators.isEmpty)

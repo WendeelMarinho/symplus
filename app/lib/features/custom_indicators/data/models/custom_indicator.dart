@@ -51,8 +51,8 @@ class CustomIndicator {
       'category_ids': categoryIds,
       if (totalValue != null) 'total_value': totalValue,
       if (percentage != null) 'percentage': percentage,
-      if (createdAt != null) 'created_at': createdAt.toIso8601String(),
-      if (updatedAt != null) 'updated_at': updatedAt.toIso8601String(),
+      if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
+      if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
     };
   }
 

@@ -62,6 +62,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   }
 
   Future<void> _loadDashboard() async {
+    if (!mounted) return;
+    
     setState(() {
       _isLoading = true;
       _error = null;
@@ -78,12 +80,16 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         to: dates.to.toIso8601String().split('T')[0],
       );
       
+      if (!mounted) return;
+      
       setState(() {
         _data = data;
         _isLoading = false;
       });
       TelemetryService.logAction('dashboard.loaded');
     } catch (e) {
+      if (!mounted) return;
+      
       setState(() {
         _error = e.toString();
         _isLoading = false;
@@ -268,6 +274,13 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     final canViewReports = PermissionHelper.hasPermission(authState, Permission.viewReportsPl);
     final isMobile = ResponsiveUtils.isMobile(context);
 
+    // Observar mudanças no período para recarregar dashboard
+    ref.listen(periodFilterProvider, (previous, next) {
+      if (previous != next && mounted) {
+        _loadDashboard();
+      }
+    });
+
     return KeyboardListener(
       focusNode: _quickActionsFocusNode,
       onKeyEvent: (event) {
@@ -325,9 +338,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
       },
       child: Focus(
         autofocus: true,
-        child: _PeriodFilterListener(
-          onPeriodChanged: () => _loadDashboard(),
-          child: Column(
+        child: Column(
             children: [
               // Header com contexto (organização + período)
               _buildDashboardHeader(context, authState, isMobile),
@@ -652,6 +663,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   }
 
   Widget _buildPeriodSummary() {
+    final currencyState = ref.watch(currencyProvider);
     final summary = _data!.financialSummary;
     final fromDate = DateTime.parse(summary.period.from);
     final toDate = DateTime.parse(summary.period.to);
@@ -1003,7 +1015,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                     ],
                   ),
                   const SizedBox(height: 20),
-                  Expanded(
+                  SizedBox(
+                    height: 250,
                     child: IncomeExpenseBarChart(
                       data: _data!.monthlyIncomeExpense,
                       onBarTap: _navigateToTransactionsMonth,
@@ -1018,11 +1031,12 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         // Donut Charts - Receitas e Despesas por Categoria
         Expanded(
           flex: 1,
-          child: Column(
-            children: [
-              // Donut Chart - Receitas por Categoria
-              Expanded(
-                child: Card(
+          child: IntrinsicHeight(
+            child: Column(
+              children: [
+                // Donut Chart - Receitas por Categoria
+                Expanded(
+                  child: Card(
                   elevation: 3,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -1049,7 +1063,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                           ],
                         ),
                         const SizedBox(height: 16),
-                        Expanded(
+                        SizedBox(
+                          height: 200,
                           child: TopCategoriesDonutChart(
                             categories: _data!.topCategories.income.take(5).toList(),
                             onSliceTap: (categoryId) {
@@ -1099,7 +1114,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                           ],
                         ),
                         const SizedBox(height: 16),
-                        Expanded(
+                        SizedBox(
+                          height: 200,
                           child: TopCategoriesDonutChart(
                             categories: _data!.topCategories.expenses.take(5).toList(),
                             onSliceTap: _navigateToTransactionsCategory,
@@ -1111,6 +1127,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                 ),
               ),
             ],
+            ),
           ),
         ),
       ],
@@ -1118,6 +1135,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   }
 
   Widget _buildRecentTransactions() {
+    final currencyState = ref.watch(currencyProvider);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1185,6 +1203,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   }
 
   Widget _buildUpcomingDueItems(bool canMarkPaid) {
+    final currencyState = ref.watch(currencyProvider);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1304,6 +1323,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   }
 
   Widget _buildAccountBalances() {
+    final currencyState = ref.watch(currencyProvider);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1376,6 +1396,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   }
 
   Widget _buildOverdueBadge() {
+    final currencyState = ref.watch(currencyProvider);
     final count = _data!.overdueItems.length;
     final total = _data!.overdueItems.fold<double>(
       0.0,

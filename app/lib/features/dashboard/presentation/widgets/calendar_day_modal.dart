@@ -269,13 +269,24 @@ class CalendarDayModal extends ConsumerWidget {
                       subtitle: DateFormat('HH:mm').format(
                         DateTime.parse(transaction.occurredAt),
                       ),
-                      amount: transaction.amount,
-                      amountColor: transaction.type == 'income'
-                          ? Colors.green
-                          : Colors.red,
+                      trailing: Text(
+                        CurrencyFormatter.format(
+                          transaction.amount,
+                          ref.watch(currencyProvider),
+                        ),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: transaction.type == 'income'
+                              ? Colors.green
+                              : Colors.red,
+                        ),
+                      ),
                       leadingIcon: transaction.type == 'income'
                           ? Icons.arrow_downward
                           : Icons.arrow_upward,
+                      leadingColor: transaction.type == 'income'
+                          ? Colors.green
+                          : Colors.red,
                       onTap: () {
                         // TODO: Navegar para detalhe da transação quando implementado
                         Navigator.of(context).pop();
@@ -308,11 +319,22 @@ class CalendarDayModal extends ConsumerWidget {
                     child: ListItemCard(
                       title: dueItem.title,
                       subtitle: 'Status: ${dueItem.status}',
-                      amount: dueItem.amount,
-                      amountColor: dueItem.status == 'overdue'
+                      trailing: Text(
+                        CurrencyFormatter.format(
+                          dueItem.amount,
+                          ref.watch(currencyProvider),
+                        ),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: dueItem.status == 'overdue'
+                              ? Colors.red
+                              : Colors.orange,
+                        ),
+                      ),
+                      leadingIcon: Icons.calendar_today,
+                      leadingColor: dueItem.status == 'overdue'
                           ? Colors.red
                           : Colors.orange,
-                      leadingIcon: Icons.calendar_today,
                       onTap: () {
                         Navigator.of(context).pop();
                         context.go('/app/due-items?date=$dateStr');

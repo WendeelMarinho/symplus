@@ -1,10 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:file_picker/file_picker.dart';
-import '../network/dio_client.dart';
-import '../config/api_config.dart';
-import '../auth/auth_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../network/dio_client.dart';
+import '../../config/api_config.dart';
+import '../auth/auth_provider.dart';
 
 /// Service para upload de avatar/logo
 class AvatarService {
@@ -13,7 +13,7 @@ class AvatarService {
   /// Retorna a URL do arquivo após upload bem-sucedido
   static Future<String> uploadAvatar({
     required PlatformFile file,
-    required Ref ref,
+    required WidgetRef ref,
     Function(int sent, int total)? onSendProgress,
   }) async {
     // Validar tamanho (máximo 5MB)

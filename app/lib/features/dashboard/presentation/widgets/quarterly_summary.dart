@@ -49,19 +49,6 @@ class _QuarterlySummaryState extends ConsumerState<QuarterlySummary> {
     _loadQuarterlyData();
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Observar mudanças no período global
-    ref.listen<PeriodFilterState>(
-      periodFilterProvider,
-      (previous, next) {
-        if (previous != next) {
-          _loadQuarterlyData();
-        }
-      },
-    );
-  }
 
   /// Calcula o trimestre baseado na data inicial do período global
   /// Se o período não for trimestral, calcula o trimestre que contém a data inicial
@@ -174,6 +161,16 @@ class _QuarterlySummaryState extends ConsumerState<QuarterlySummary> {
     final isMobile = ResponsiveUtils.isMobile(context);
     final periodState = ref.watch(periodFilterProvider);
     final currencyState = ref.watch(currencyProvider);
+
+    // Observar mudanças no período global
+    ref.listen<PeriodFilterState>(
+      periodFilterProvider,
+      (previous, next) {
+        if (previous != next) {
+          _loadQuarterlyData();
+        }
+      },
+    );
 
     if (_isLoading) {
       return Card(

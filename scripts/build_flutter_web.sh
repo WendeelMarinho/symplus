@@ -35,9 +35,9 @@ echo ""
 echo "3️⃣  Fazendo build de produção..."
 # Build com API_BASE_URL para produção
 # Usando --dart-define para garantir que a URL correta seja usada
+# Nota: --web-renderer foi removido nas versões mais recentes do Flutter
 flutter build web \
     --release \
-    --web-renderer html \
     --dart-define=API_BASE_URL=https://srv1113923.hstgr.cloud \
     --base-href=/app/
 echo ""

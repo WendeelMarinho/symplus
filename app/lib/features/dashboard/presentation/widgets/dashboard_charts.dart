@@ -191,19 +191,6 @@ class TopCategoriesDonutChart extends ConsumerWidget {
                     }
                   }
                 },
-                touchTooltipData: PieTouchTooltipData(
-                  tooltipRoundedRadius: 8,
-                  tooltipBgColor: Colors.grey[800]!,
-                  tooltipPadding: const EdgeInsets.all(8),
-                  getTooltipItems: (touchedSection) {
-                    return [
-                      PieTooltipItem(
-                        '${touchedSection.title}\n${_formatCurrency(touchedSection.value, currencyState)}',
-                        const TextStyle(color: Colors.white, fontSize: 12, height: 1.5),
-                      ),
-                    ];
-                  },
-                ),
               ),
             ),
           ),

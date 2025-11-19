@@ -327,7 +327,7 @@ class _DashboardDetailsPageState
                 ? const LoadingState()
                 : _error != null
                     ? ErrorState(
-                        error: _error!,
+                        message: _error!,
                         onRetry: () => _loadTransactions(),
                       )
                     : _transactions.isEmpty
@@ -366,7 +366,7 @@ class _DashboardDetailsPageState
                                   padding: const EdgeInsets.only(bottom: 8.0),
                                   child: ListItemCard(
                                     title: transaction.description,
-                                    subtitle: _formatDate(transaction.occurredAt),
+                                    subtitle: _formatDate(transaction.occurredAt.toString()),
                                     trailing: Consumer(
                                       builder: (context, ref, child) {
                                         final currencyState = ref.watch(currencyProvider);

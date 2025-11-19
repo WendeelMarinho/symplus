@@ -36,7 +36,7 @@ class AvatarNotifier extends StateNotifier<AvatarState> {
     _loadAvatar();
     // Observar mudanças no auth para recarregar avatar quando necessário
     _ref.listen<AuthState>(authProvider, (previous, next) {
-      if (next.isAuthenticated && (!previous.isAuthenticated || 
+      if (next.isAuthenticated && (previous == null || !previous.isAuthenticated || 
           previous.organizationId != next.organizationId)) {
         _loadAvatar();
       }

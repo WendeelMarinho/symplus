@@ -179,15 +179,14 @@ class _CustomIndicatorDialogState
                                       _selectedCategoryIds.contains(category.id);
 
                                   return CheckboxListTile(
+                                    value: isSelected,
+                                    onChanged: (_) => _toggleCategory(category.id),
                                     title: Text(category.name),
                                     subtitle: Text(
                                       category.type == 'income'
                                           ? 'Receita'
                                           : 'Despesa',
-                                      ),
                                     ),
-                                    value: isSelected,
-                                    onChanged: (_) => _toggleCategory(category.id),
                                     dense: true,
                                   );
                                 },

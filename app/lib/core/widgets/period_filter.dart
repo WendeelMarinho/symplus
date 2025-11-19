@@ -112,7 +112,7 @@ class PeriodFilter extends ConsumerWidget {
         _buildMenuItem(
           context,
           PeriodType.year,
-          Icons.calendar_view_year,
+          Icons.calendar_today,
           context.t('period_filter.year'),
           periodState.type == PeriodType.year,
         ),
@@ -128,7 +128,7 @@ class PeriodFilter extends ConsumerWidget {
     );
   }
 
-  Widget _buildMenuItem(
+  PopupMenuEntry<PeriodType> _buildMenuItem(
     BuildContext context,
     PeriodType type,
     IconData icon,

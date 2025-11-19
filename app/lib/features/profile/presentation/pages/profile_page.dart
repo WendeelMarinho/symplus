@@ -6,8 +6,8 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
-// Import condicional para File/FileImage (apenas em mobile)
-import 'dart:io' if (dart.library.html) 'dart:html' as io;
+import '../../../../core/widgets/file_image_helper.dart';
+import 'package:flutter/services.dart';
 import '../../../../core/widgets/page_header.dart';
 import '../../../../core/widgets/toast_service.dart';
 import '../../../../core/auth/auth_provider.dart';
@@ -99,7 +99,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         allowMultiple: false,
       );
 
-      if (result != null && result.files.single.path != null) {
+      if (result != null && result.files.isNotEmpty && result.files.single.path != null) {
         setState(() {
           _isUploadingAvatar = true;
         });
@@ -132,18 +132,21 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 
   Widget _buildAvatar() {
+    ImageProvider? backgroundImage;
+    if (_avatarUrl != null) {
+      if (_avatarUrl!.startsWith('http') || _avatarUrl!.startsWith('https')) {
+        backgroundImage = NetworkImage(_avatarUrl!);
+      } else {
+        backgroundImage = FileImageHelper.createImageProvider(_avatarUrl!);
+      }
+    }
+
     return Stack(
       children: [
         CircleAvatar(
           radius: 50,
           backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-          backgroundImage: _avatarUrl != null
-              ? (_avatarUrl!.startsWith('http') || _avatarUrl!.startsWith('https')
-                  ? NetworkImage(_avatarUrl!)
-                  : kIsWeb
-                      ? NetworkImage(_avatarUrl!)
-                      : io.File(_avatarUrl!) as ImageProvider)
-              : null,
+          backgroundImage: backgroundImage,
           child: _avatarUrl == null
               ? Text(
                   (_nameController.text.isNotEmpty

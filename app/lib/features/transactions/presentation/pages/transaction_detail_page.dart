@@ -161,7 +161,7 @@ class _TransactionDetailPageState
 
     if (_error != null || _transaction == null) {
       return ErrorState(
-        error: _error ?? 'Transação não encontrada',
+        message: _error ?? 'Transação não encontrada',
         onRetry: _loadTransaction,
       );
     }

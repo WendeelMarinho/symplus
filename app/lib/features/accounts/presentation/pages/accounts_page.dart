@@ -12,6 +12,7 @@ import '../../../../core/widgets/list_item_card.dart';
 import '../../../../core/widgets/confirm_dialog.dart';
 import '../../../../core/auth/auth_provider.dart';
 import '../../../../core/navigation/menu_catalog.dart';
+import '../../../../core/accessibility/telemetry_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/services/account_service.dart';
 import '../../data/models/account.dart';
@@ -297,9 +298,11 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                            'Erro ao criar conta';
         ToastService.showError(context, errorMessage);
         
-        // Log para debug
-        print('Erro ao criar conta: ${e.response?.statusCode}');
-        print('Resposta: ${e.response?.data}');
+        // Log de erro
+        TelemetryService.logError(
+          'Erro ao criar conta: ${e.response?.statusCode}',
+          metadata: {'response': e.response?.data?.toString() ?? 'N/A'},
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -307,7 +310,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
           _isCreating = false;
         });
         ToastService.showError(context, 'Erro ao criar conta: ${e.toString()}');
-        print('Erro inesperado ao criar conta: $e');
+        TelemetryService.logError('Erro inesperado ao criar conta: $e');
       }
     }
   }

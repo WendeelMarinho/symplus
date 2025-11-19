@@ -148,7 +148,7 @@ class _CustomIndicatorDetailsPageState
     if (_error != null || _indicator == null) {
       return Scaffold(
         body: ErrorState(
-          error: _error ?? 'Indicador não encontrado',
+          message: _error ?? 'Indicador não encontrado',
           onRetry: () => _loadData(),
         ),
       );

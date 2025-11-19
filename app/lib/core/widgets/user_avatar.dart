@@ -4,8 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../auth/auth_provider.dart';
 import '../providers/avatar_provider.dart';
 
-// Import condicional para File/FileImage (apenas em mobile)
-import 'dart:io' if (dart.library.html) 'dart:html' as io;
+import 'file_image_helper.dart';
 
 /// Widget reutilizável para exibir avatar/logo do usuário
 /// 
@@ -126,18 +125,8 @@ class UserAvatar extends ConsumerWidget {
       // Na web, isso pode não funcionar, então retornar NetworkImage
       return NetworkImage(url);
     } else {
-      // Mobile: tentar como FileImage (apenas se não for web)
-      if (!kIsWeb) {
-        try {
-          // ignore: avoid_web_libraries_in_flutter
-          return FileImage(io.File(url));
-        } catch (e) {
-          // Se falhar, tentar como NetworkImage
-          return NetworkImage(url);
-        }
-      }
-      // Fallback para NetworkImage
-      return NetworkImage(url);
+      // Usar helper que funciona em web e mobile
+      return FileImageHelper.createImageProvider(url);
     }
   }
 }
