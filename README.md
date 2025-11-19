@@ -5,6 +5,8 @@ Plataforma completa de gestão financeira multi-tenant.
 ## 📚 Documentação
 
 ### Documentação Principal
+- **[DEPLOY.md](./DEPLOY.md)** - Guia técnico de deploy para produção
+- **[PROMPT_IA.md](./PROMPT_IA.md)** - Prompt direto para IA fazer deploy
 - **[REBUILD_FLUTTER_WEB.md](./REBUILD_FLUTTER_WEB.md)** - Instruções para rebuild do Flutter Web
 - `docs/` - Documentação geral
 - `backend/README.md` - Documentação do backend
@@ -16,26 +18,21 @@ Ver `docs/QUICK_START.md` para instruções de setup.
 
 ## 🚀 Deploy para Produção
 
-### 1. Executar Migration (Backend)
-```bash
-cd backend
-make migrate
-```
+**Guia completo:** [DEPLOY.md](./DEPLOY.md)  
+**Prompt para IA:** [PROMPT_IA.md](./PROMPT_IA.md)
 
-### 2. Build Flutter Web
-```bash
-bash scripts/build_flutter_web.sh
-```
+### Comandos Rápidos
 
-### 3. Push para GitHub
 ```bash
-bash scripts/push_to_github.sh
-```
+# 1. Migration
+cd backend && docker compose -f docker-compose.prod.yml exec php php artisan migrate
 
-Ver documentação completa em:
-- [PRODUCTION_CHECKLIST.md](./PRODUCTION_CHECKLIST.md)
-- [NEXT_STEP_MIGRATION.md](./NEXT_STEP_MIGRATION.md)
-- [PUSH_TO_GITHUB.md](./PUSH_TO_GITHUB.md)
+# 2. Build Flutter
+cd app && flutter build web --release --dart-define=API_BASE_URL=https://srv1113923.hstgr.cloud --base-href=/app/
+
+# 3. Commit e Push
+git add . && git commit -m "feat: Deploy produção" && git push origin main
+```
 
 ## 📊 Status da Implementação
 

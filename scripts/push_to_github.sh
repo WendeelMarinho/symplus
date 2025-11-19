@@ -1,6 +1,10 @@
 #!/bin/bash
 # Script para fazer commit e push para o GitHub
 # Repositório: https://github.com/WendeelMarinho/symplus.git
+#
+# Uso:
+#   chmod +x scripts/push_to_github.sh
+#   bash scripts/push_to_github.sh
 
 set -e
 

@@ -61,11 +61,12 @@ class TelemetryService {
   }
 
   /// Registra erro
-  static void logError(String error, {String? context, StackTrace? stackTrace}) {
+  static void logError(String error, {String? context, StackTrace? stackTrace, Map<String, dynamic>? metadata}) {
     logAction('error', metadata: {
       'error': error,
       if (context != null) 'context': context,
       if (stackTrace != null) 'stack_trace': stackTrace.toString(),
+      if (metadata != null) ...metadata,
     });
   }
 
