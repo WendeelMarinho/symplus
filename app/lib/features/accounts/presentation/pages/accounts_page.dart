@@ -13,6 +13,12 @@ import '../../../../core/widgets/confirm_dialog.dart';
 import '../../../../core/auth/auth_provider.dart';
 import '../../../../core/navigation/menu_catalog.dart';
 import '../../../../core/accessibility/telemetry_service.dart';
+import '../../../../core/accessibility/responsive_utils.dart';
+import '../../../../core/design/app_colors.dart';
+import '../../../../core/design/app_typography.dart';
+import '../../../../core/design/app_spacing.dart';
+import '../../../../core/design/app_borders.dart';
+import '../../../../core/accessibility/accessible_widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/services/account_service.dart';
 import '../../data/models/account.dart';
@@ -36,6 +42,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
   int _currentPage = 1;
   int _totalPages = 1;
   bool _hasMore = false;
+  bool _balanceVisible = true;
 
   @override
   void initState() {
@@ -130,115 +137,262 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
       context: context,
       barrierDismissible: !_isCreating,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Row(
-            children: [
-              Icon(Icons.add_circle, color: Theme.of(context).colorScheme.primary),
-              const SizedBox(width: 12),
-              const Text('Nova Conta'),
-            ],
+        builder: (context, setDialogState) => Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
           ),
-          content: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Preencha os dados da nova conta financeira.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: 500,
+              maxHeight: 700,
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Header moderno
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(20),
+                          topRight: Radius.circular(20),
                         ),
-                  ),
-                  const SizedBox(height: 20),
-                  TextFormField(
-                    controller: nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Nome da Conta *',
-                      hintText: 'Ex: Conta Corrente, Poupança',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.account_balance_wallet),
-                      helperText: 'Nome que identifica esta conta',
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.add_circle,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Nova Conta',
+                                  style: AppTypography.headlineSmall.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.onSurface,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Preencha os dados da nova conta financeira.',
+                                  style: AppTypography.bodyMedium.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: isSubmitting
+                                ? null
+                                : () => Navigator.of(context).pop(false),
+                            color: AppColors.textSecondary,
+                          ),
+                        ],
+                      ),
                     ),
-                    validator: (value) =>
-                        value?.isEmpty ?? true ? 'Nome é obrigatório' : null,
-                    autofocus: true,
-                    enabled: !isSubmitting,
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: currencyController,
-                    decoration: const InputDecoration(
-                      labelText: 'Moeda *',
-                      hintText: 'BRL, USD, EUR',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.attach_money),
-                      helperText: 'Código da moeda (3 letras)',
+                    // Conteúdo com scroll
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            TextFormField(
+                              controller: nameController,
+                              decoration: InputDecoration(
+                                labelText: 'Nome da Conta *',
+                                hintText: 'Ex: Conta Corrente, Poupança',
+                                filled: true,
+                                fillColor: AppColors.background,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.border),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.border),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.primary, width: 2),
+                                ),
+                                prefixIcon: Icon(Icons.account_balance_wallet, color: AppColors.primary),
+                                helperText: 'Nome que identifica esta conta',
+                                helperStyle: AppTypography.caption,
+                              ),
+                              style: AppTypography.bodyMedium,
+                              validator: (value) => value?.isEmpty ?? true ? 'Nome é obrigatório' : null,
+                              autofocus: true,
+                              enabled: !isSubmitting,
+                            ),
+                            const SizedBox(height: 20),
+                            TextFormField(
+                              controller: currencyController,
+                              decoration: InputDecoration(
+                                labelText: 'Moeda *',
+                                hintText: 'BRL',
+                                filled: true,
+                                fillColor: AppColors.background,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.border),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.border),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.primary, width: 2),
+                                ),
+                                prefixIcon: Icon(Icons.attach_money, color: AppColors.primary),
+                                helperText: 'Código da moeda (3 letras)',
+                                helperStyle: AppTypography.caption,
+                                counterText: '3/3',
+                              ),
+                              style: AppTypography.bodyMedium,
+                              maxLength: 3,
+                              textCapitalization: TextCapitalization.characters,
+                              validator: (value) {
+                                if (value?.isEmpty ?? true) return 'Moeda é obrigatória';
+                                if ((value?.length ?? 0) != 3) return 'Moeda deve ter exatamente 3 caracteres';
+                                return null;
+                              },
+                              enabled: !isSubmitting,
+                            ),
+                            const SizedBox(height: 20),
+                            TextFormField(
+                              controller: balanceController,
+                              decoration: InputDecoration(
+                                labelText: 'Saldo Inicial (opcional)',
+                                hintText: '0,00',
+                                filled: true,
+                                fillColor: AppColors.background,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.border),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.border),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.primary, width: 2),
+                                ),
+                                prefixIcon: Icon(Icons.account_balance, color: AppColors.primary),
+                                helperText: 'Saldo inicial da conta',
+                                helperStyle: AppTypography.caption,
+                              ),
+                              style: AppTypography.bodyMedium,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              enabled: !isSubmitting,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                    textCapitalization: TextCapitalization.characters,
-                    maxLength: 3,
-                    enabled: !isSubmitting,
-                    validator: (value) {
-                      if (value?.isEmpty ?? true) return 'Moeda é obrigatória';
-                      if ((value?.length ?? 0) != 3) return 'Moeda deve ter exatamente 3 caracteres';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: balanceController,
-                    decoration: const InputDecoration(
-                      labelText: 'Saldo Inicial (opcional)',
-                      hintText: '0.00',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.account_balance),
-                      helperText: 'Saldo inicial da conta',
+                    // Botões fixos no rodapé
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          top: BorderSide(color: AppColors.border, width: 1),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: isSubmitting
+                                ? null
+                                : () => Navigator.of(context).pop(false),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            ),
+                            child: Text(
+                              'Cancelar',
+                              style: AppTypography.labelLarge.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          FilledButton(
+                            onPressed: isSubmitting
+                                ? null
+                                : () async {
+                                    if (formKey.currentState!.validate()) {
+                                      setDialogState(() {
+                                        isSubmitting = true;
+                                      });
+                                      
+                                      Navigator.of(context).pop(true);
+                                      
+                                      await _createAccount(
+                                        name: nameController.text.trim(),
+                                        currency: currencyController.text.toUpperCase().trim(),
+                                        openingBalance: balanceController.text.isNotEmpty
+                                            ? double.tryParse(balanceController.text.replaceAll(',', '.'))
+                                            : null,
+                                      );
+                                    }
+                                  },
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: isSubmitting
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    ),
+                                  )
+                                : Text(
+                                    'Criar Conta',
+                                    style: AppTypography.labelLarge.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                          ),
+                        ],
+                      ),
                     ),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    enabled: !isSubmitting,
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: isSubmitting
-                  ? null
-                  : () => Navigator.of(context).pop(false),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: isSubmitting
-                  ? null
-                  : () async {
-                      if (formKey.currentState!.validate()) {
-                        setDialogState(() {
-                          isSubmitting = true;
-                        });
-                        
-                        // Fechar diálogo e criar conta
-                        Navigator.of(context).pop(true);
-                        
-                        await _createAccount(
-                          name: nameController.text.trim(),
-                          currency: currencyController.text.toUpperCase().trim(),
-                          openingBalance: balanceController.text.isNotEmpty
-                              ? double.tryParse(balanceController.text.replaceAll(',', '.'))
-                              : null,
-                        );
-                      }
-                    },
-              child: isSubmitting
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Criar Conta'),
-            ),
-          ],
         ),
       ),
     );
@@ -500,53 +654,366 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     ).format(value);
   }
 
+  /// Card de saldo total - compacto
+  Widget _buildTotalBalanceCard(double total, String currency, bool visible) {
+    final isPositive = total >= 0;
+    return AccessibleCard(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.account_balance,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Saldo Total',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      DateFormat('MMMM yyyy', 'pt_BR').format(DateTime.now()),
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.textTertiary,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                IconButton(
+                  icon: Icon(
+                    visible ? Icons.visibility : Icons.visibility_off,
+                    color: AppColors.textSecondary,
+                    size: 20,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _balanceVisible = !_balanceVisible;
+                    });
+                  },
+                  tooltip: visible ? 'Ocultar saldo' : 'Mostrar saldo',
+                ),
+                Text(
+                  visible ? _formatCurrency(total, currency) : '••••••',
+                  style: AppTypography.headlineMedium.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: isPositive ? AppColors.income : AppColors.expense,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Lista de contas para mobile
+  Widget _buildMobileAccountsList(bool canEdit) {
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          final account = _accounts[index];
+          return Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.md),
+            child: _buildAccountCard(account, canEdit),
+          );
+        },
+        childCount: _accounts.length,
+      ),
+    );
+  }
+
+  /// Grid de contas para desktop (2 colunas)
+  Widget _buildDesktopAccountsGrid(bool canEdit) {
+    return SliverGrid(
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: AppSpacing.md,
+        mainAxisSpacing: AppSpacing.md,
+        childAspectRatio: 1.2,
+      ),
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          final account = _accounts[index];
+          return _buildAccountCard(account, canEdit);
+        },
+        childCount: _accounts.length,
+      ),
+    );
+  }
+
+  /// Card individual de conta - compacto
+  Widget _buildAccountCard(Account account, bool canEdit) {
+    final isPositive = account.balance >= 0;
+    return AccessibleCard(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppBorders.cardRadius),
+          onTap: () => context.push('/app/accounts/${account.id}'),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // Ícone circular
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: (isPositive ? AppColors.income : AppColors.expense).withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.account_balance_wallet_rounded,
+                    color: isPositive ? AppColors.income : AppColors.expense,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Conteúdo
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        account.name,
+                        style: AppTypography.bodyMedium.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        account.currency,
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Valor alinhado à direita
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _formatCurrency(account.balance, account.currency),
+                      style: AppTypography.titleMedium.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: isPositive ? AppColors.income : AppColors.expense,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 8),
+                // Menu de ações
+                PopupMenuButton<String>(
+                  icon: Icon(Icons.more_vert, color: AppColors.textSecondary, size: 18),
+                  tooltip: 'Ações',
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  onSelected: (value) {
+                    switch (value) {
+                      case 'edit':
+                        _editAccount(account);
+                        break;
+                      case 'view':
+                        context.push('/app/accounts/${account.id}');
+                        break;
+                      case 'delete':
+                        _deleteAccount(account);
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    if (canEdit)
+                      PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit, size: 18, color: AppColors.textSecondary),
+                            const SizedBox(width: 8),
+                            Text('Editar', style: AppTypography.bodySmall),
+                          ],
+                        ),
+                      ),
+                    PopupMenuItem(
+                      value: 'view',
+                      child: Row(
+                        children: [
+                          Icon(Icons.visibility, size: 18, color: AppColors.textSecondary),
+                          const SizedBox(width: 8),
+                          Text('Ver detalhes', style: AppTypography.bodySmall),
+                        ],
+                      ),
+                    ),
+                    if (canEdit) ...[
+                      const PopupMenuDivider(),
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete, size: 18, color: AppColors.error),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Excluir',
+                              style: AppTypography.bodySmall.copyWith(
+                                color: AppColors.error,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Card de adicionar conta (grande, roxo)
+  Widget _buildAddAccountCard() {
+    return AccessibleCard(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppBorders.cardRadius),
+          onTap: _isCreating ? null : _showCreateDialog,
+          child: Container(
+            padding: EdgeInsets.all(AppSpacing.xl),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.secondary.withOpacity(0.1),
+                  AppColors.secondary.withOpacity(0.05),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(AppBorders.cardRadius),
+              border: Border.all(
+                color: AppColors.secondary.withOpacity(0.3),
+                width: 2,
+                style: BorderStyle.solid,
+              ),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  decoration: BoxDecoration(
+                    color: AppColors.secondary,
+                    shape: BoxShape.circle,
+                  ),
+                  child: _isCreating
+                      ? const SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Icon(
+                          Icons.add,
+                          color: Colors.white,
+                          size: 32,
+                        ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  _isCreating ? 'Criando conta...' : 'Adicionar Nova Conta',
+                  style: AppTypography.sectionTitle.copyWith(
+                    color: AppColors.secondary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  'Clique para criar uma nova conta financeira',
+                  style: AppTypography.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Calcular saldo total
+  double _getTotalBalance() {
+    return _accounts.fold<double>(0.0, (sum, account) => sum + account.balance);
+  }
+
+  // Obter moeda principal (primeira conta ou BRL)
+  String _getMainCurrency() {
+    if (_accounts.isEmpty) return 'BRL';
+    return _accounts.first.currency;
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
-    // Permitir criar conta para owner e admin
     final canEdit = authState.role == UserRole.owner || authState.role == UserRole.admin;
-
     final hasFilters = _filterType != null || (_searchQuery?.isNotEmpty ?? false);
+    final isMobile = ResponsiveUtils.isMobile(context);
+    final totalBalance = _getTotalBalance();
+    final mainCurrency = _getMainCurrency();
 
     return Column(
       children: [
         PageHeader(
           title: 'Contas',
           subtitle: 'Gerencie suas contas bancárias e financeiras',
-          breadcrumbs: const ['Financeiro', 'Contas'],
           actions: [
-            // Botão Adicionar Conta no header (sempre visível, desabilitado se não tiver permissão)
-            // Usar ElevatedButton para garantir visibilidade em todas as telas
-            ElevatedButton.icon(
-              onPressed: (canEdit && !_isCreating) ? _showCreateDialog : null,
-              icon: _isCreating
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Icon(Icons.add_circle, size: 20),
-              label: Text(_isCreating ? 'Criando...' : 'Adicionar Conta'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                minimumSize: const Size(140, 40),
-              ),
-            ),
             if (hasFilters)
               IconButton(
                 icon: const Icon(Icons.clear),
                 onPressed: _clearFilters,
                 tooltip: 'Limpar filtros',
+                color: AppColors.textSecondary,
               ),
             IconButton(
               icon: const Icon(Icons.filter_list),
               onPressed: _showFilterDialog,
               tooltip: 'Filtrar',
+              color: AppColors.textSecondary,
             ),
             IconButton(
               icon: const Icon(Icons.download),
@@ -554,20 +1021,24 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                 ToastService.showInfo(context, 'Exportação em breve');
               },
               tooltip: 'Exportar',
+              color: AppColors.textSecondary,
             ),
           ],
         ),
         // Barra de busca
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: AppSpacing.pagePadding(context).horizontal,
+            vertical: AppSpacing.sm,
+          ),
           child: TextField(
             controller: _searchController,
             decoration: InputDecoration(
               hintText: 'Buscar contas...',
-              prefixIcon: const Icon(Icons.search),
+              prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
               suffixIcon: _searchController.text.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Icons.clear),
+                      icon: const Icon(Icons.clear, color: AppColors.textSecondary),
                       onPressed: () {
                         _searchController.clear();
                         setState(() {
@@ -579,12 +1050,21 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                     )
                   : null,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppBorders.inputRadius),
+                borderSide: BorderSide(color: AppColors.border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppBorders.inputRadius),
+                borderSide: BorderSide(color: AppColors.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppBorders.inputRadius),
+                borderSide: BorderSide(color: AppColors.primary, width: 2),
               ),
             ),
           ),
         ),
-        // ActionBar com botão Adicionar Conta (sempre visível)
+        // ActionBar
         if (!_isCreating)
           ActionBar(
             actions: [
@@ -609,10 +1089,31 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                         _loadAccounts();
                       },
                     )
-                  : _accounts.isEmpty
-                      ? Column(
-                          children: [
-                            Expanded(
+                  : RefreshIndicator(
+                      onRefresh: () async {
+                        setState(() {
+                          _currentPage = 1;
+                        });
+                        await _loadAccounts();
+                      },
+                      child: CustomScrollView(
+                        slivers: [
+                          // Bloco de saldo total (se houver contas)
+                          if (_accounts.isNotEmpty)
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding: EdgeInsets.only(
+                                  left: AppSpacing.pagePadding(context).horizontal,
+                                  right: AppSpacing.pagePadding(context).horizontal,
+                                  top: AppSpacing.md,
+                                  bottom: AppSpacing.md,
+                                ),
+                                child: _buildTotalBalanceCard(totalBalance, mainCurrency, _balanceVisible),
+                              ),
+                            ),
+                          // Lista de contas ou empty state
+                          if (_accounts.isEmpty)
+                            SliverFillRemaining(
                               child: EmptyState(
                                 icon: Icons.account_balance_wallet,
                                 title: 'Nenhuma conta encontrada',
@@ -622,199 +1123,53 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                                 actionLabel: canEdit ? 'Criar Primeira Conta' : null,
                                 onAction: canEdit ? _showCreateDialog : null,
                               ),
+                            )
+                          else
+                            SliverPadding(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: AppSpacing.pagePadding(context).horizontal,
+                                vertical: AppSpacing.md,
+                              ),
+                              sliver: isMobile
+                                  ? _buildMobileAccountsList(canEdit)
+                                  : _buildDesktopAccountsGrid(canEdit),
                             ),
-                            // Botão adicional sempre visível no bottom
-                            if (canEdit)
-                              Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: SizedBox(
-                                  width: double.infinity,
-                                  child: FilledButton.icon(
-                                    onPressed: _isCreating ? null : _showCreateDialog,
-                                    icon: _isCreating
-                                        ? const SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                            ),
-                                          )
-                                        : const Icon(Icons.add_circle, size: 24),
+                          // Card de adicionar conta (se houver contas e permissão)
+                          if (_accounts.isNotEmpty && canEdit)
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.pagePadding(context).horizontal,
+                                  vertical: AppSpacing.md,
+                                ),
+                                child: _buildAddAccountCard(),
+                              ),
+                            ),
+                          // Botão "Carregar mais"
+                          if (_hasMore)
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding: EdgeInsets.all(AppSpacing.lg),
+                                child: Center(
+                                  child: OutlinedButton.icon(
+                                    onPressed: () {
+                                      setState(() {
+                                        _currentPage++;
+                                      });
+                                      _loadAccounts(showLoading: false);
+                                    },
+                                    icon: const Icon(Icons.expand_more),
                                     label: Text(
-                                      _isCreating ? 'Criando conta...' : 'Adicionar Conta',
-                                      style: const TextStyle(fontSize: 16),
-                                    ),
-                                    style: FilledButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(vertical: 16),
+                                      'Carregar mais',
+                                      style: AppTypography.label,
                                     ),
                                   ),
                                 ),
                               ),
-                          ],
-                        )
-                      : RefreshIndicator(
-                          onRefresh: () async {
-                            setState(() {
-                              _currentPage = 1;
-                            });
-                            await _loadAccounts();
-                          },
-                          child: ListView.builder(
-                            itemCount: _accounts.length + (_hasMore ? 1 : 0),
-                            itemBuilder: (context, index) {
-                              if (index == _accounts.length) {
-                                // Botão "Carregar mais"
-                                return Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Center(
-                                    child: OutlinedButton.icon(
-                                      onPressed: () {
-                                        setState(() {
-                                          _currentPage++;
-                                        });
-                                        _loadAccounts(showLoading: false);
-                                      },
-                                      icon: const Icon(Icons.expand_more),
-                                      label: const Text('Carregar mais'),
-                                    ),
-                                  ),
-                                );
-                              }
-
-                              final account = _accounts[index];
-                              return Card(
-                                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                child: ListTile(
-                                  leading: CircleAvatar(
-                                    backgroundColor: account.balance >= 0 
-                                        ? Colors.green.shade100 
-                                        : Colors.red.shade100,
-                                    child: Icon(
-                                      Icons.account_balance_wallet,
-                                      color: account.balance >= 0 
-                                          ? Colors.green.shade700 
-                                          : Colors.red.shade700,
-                                    ),
-                                  ),
-                                  title: Text(
-                                    account.name,
-                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                  ),
-                                  subtitle: Text(
-                                    '${account.currency} • Último movimento: ${DateFormat('dd/MM/yyyy').format(account.updatedAt)}',
-                                    style: Theme.of(context).textTheme.bodySmall,
-                                  ),
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.end,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            _formatCurrency(account.balance, account.currency),
-                                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                                  fontWeight: FontWeight.bold,
-                                                  color: account.balance >= 0 
-                                                      ? Colors.green.shade700 
-                                                      : Colors.red.shade700,
-                                                ),
-                                          ),
-                                        ],
-                                      ),
-                                      PopupMenuButton<String>(
-                                        icon: const Icon(Icons.more_vert),
-                                        tooltip: 'Ações',
-                                        onSelected: (value) {
-                                          switch (value) {
-                                            case 'edit':
-                                              _editAccount(account);
-                                              break;
-                                            case 'view':
-                                              context.push('/app/accounts/${account.id}');
-                                              break;
-                                            case 'archive':
-                                              // Placeholder para arquivar
-                                              ToastService.showInfo(context, 'Funcionalidade em breve');
-                                              break;
-                                            case 'open_finance':
-                                              // Placeholder para Open Finance
-                                              ToastService.showInfo(context, 'Open Finance em breve');
-                                              break;
-                                            case 'delete':
-                                              _deleteAccount(account);
-                                              break;
-                                          }
-                                        },
-                                        itemBuilder: (context) => [
-                                          if (canEdit)
-                                            const PopupMenuItem(
-                                              value: 'edit',
-                                              child: Row(
-                                                children: [
-                                                  Icon(Icons.edit, size: 20),
-                                                  SizedBox(width: 8),
-                                                  Text('Editar'),
-                                                ],
-                                              ),
-                                            ),
-                                          const PopupMenuItem(
-                                            value: 'view',
-                                            child: Row(
-                                              children: [
-                                                Icon(Icons.visibility, size: 20),
-                                                SizedBox(width: 8),
-                                                Text('Ver detalhes'),
-                                              ],
-                                            ),
-                                          ),
-                                          if (canEdit) ...[
-                                            const PopupMenuItem(
-                                              value: 'archive',
-                                              child: Row(
-                                                children: [
-                                                  Icon(Icons.archive, size: 20),
-                                                  SizedBox(width: 8),
-                                                  Text('Arquivar'),
-                                                ],
-                                              ),
-                                            ),
-                                            const PopupMenuItem(
-                                              value: 'open_finance',
-                                              enabled: false,
-                                              child: Row(
-                                                children: [
-                                                  Icon(Icons.account_balance, size: 20),
-                                                  SizedBox(width: 8),
-                                                  Text('Open Finance'),
-                                                ],
-                                              ),
-                                            ),
-                                            const PopupMenuDivider(),
-                                            const PopupMenuItem(
-                                              value: 'delete',
-                                              child: Row(
-                                                children: [
-                                                  Icon(Icons.delete, size: 20, color: Colors.red),
-                                                  SizedBox(width: 8),
-                                                  Text('Excluir', style: TextStyle(color: Colors.red)),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                  onTap: () => context.push('/app/accounts/${account.id}'),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
+                            ),
+                        ],
+                      ),
+                    ),
         ),
       ],
     );

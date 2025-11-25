@@ -18,6 +18,11 @@ import '../../../../core/providers/period_filter_provider.dart';
 import '../../../../core/providers/currency_provider.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/l10n/app_localizations.dart';
+import '../../../../core/design/app_colors.dart';
+import '../../../../core/design/app_typography.dart';
+import '../../../../core/design/app_spacing.dart';
+import '../../../../core/design/app_borders.dart';
+import '../../../../core/accessibility/accessible_widgets.dart';
 import '../../data/models/dashboard_data.dart';
 import '../../data/models/dashboard_layout.dart';
 import '../../data/services/dashboard_service.dart';
@@ -296,7 +301,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
 
     // Observar mudanças na visão do dashboard
     ref.listen(dashboardViewProvider, (previous, next) {
-      if (previous?.selectedView != next.selectedView && mounted) {
+      if (previous?.selectedView != next?.selectedView && mounted) {
         // Recarregar dashboard quando a visão mudar
         setState(() {});
       }
@@ -428,15 +433,24 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                           ? const Center(child: Text('Nenhum dado disponível'))
                           : Stack(
                               children: [
-                                RefreshIndicator(
-                                  onRefresh: _loadDashboard,
-                                  child: _buildReorderableDashboard(
-                                    canViewTransactions: canViewTransactions,
-                                    canViewReports: canViewReports,
-                                    canViewDueItems: canViewDueItems,
-                                    canMarkPaid: canMarkPaid,
-                                  ),
-                                ),
+                                // RefreshIndicator apenas para mobile (ReorderableListView)
+                                // Para desktop, o ReorderableDashboardGrid já tem SingleChildScrollView
+                                ResponsiveUtils.isMobile(context)
+                                    ? RefreshIndicator(
+                                        onRefresh: _loadDashboard,
+                                        child: _buildReorderableDashboard(
+                                          canViewTransactions: canViewTransactions,
+                                          canViewReports: canViewReports,
+                                          canViewDueItems: canViewDueItems,
+                                          canMarkPaid: canMarkPaid,
+                                        ),
+                                      )
+                                    : _buildReorderableDashboard(
+                                        canViewTransactions: canViewTransactions,
+                                        canViewReports: canViewReports,
+                                        canViewDueItems: canViewDueItems,
+                                        canMarkPaid: canMarkPaid,
+                                      ),
                                 // Menu de Quick Actions (modal)
                                 if (_showQuickActionsMenu) _buildQuickActionsMenu(context),
                               ],
@@ -448,100 +462,22 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     );
   }
 
-  /// Constrói o header do dashboard com contexto da organização
+  /// Constrói o header do dashboard modernizado
   Widget _buildDashboardHeader(BuildContext context, AuthState authState, bool isMobile) {
-    // Determinar nome a exibir (organização ou usuário)
-    final displayName = authState.organizationName ?? authState.name ?? authState.userName ?? 'Usuário';
-    final isCompany = authState.organizationName != null && authState.organizationName!.isNotEmpty;
+    final viewState = ref.watch(dashboardViewProvider);
     
-    return Container(
-      padding: EdgeInsets.all(isMobile ? 16.0 : 20.0),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        border: Border(
-          bottom: BorderSide(
-            color: Theme.of(context).dividerColor,
-            width: 1,
-          ),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Linha 1: Nome da organização/usuário + Avatar
-          Row(
-            children: [
-              // Avatar
-              Consumer(
-                builder: (context, ref, child) {
-                  return UserAvatar(
-                    radius: isMobile ? 24 : 32,
-                    onTap: () => context.go('/app/profile'),
-                  );
-                },
-              ),
-              const SizedBox(width: 12),
-              // Nome
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      displayName,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (authState.userName != null && isCompany)
-                      Text(
-                        authState.userName!,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                            ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                  ],
-                ),
-              ),
-              // Filtro de período
-              const PeriodFilter(),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // Linha 2: Título do dashboard + Seletor de visão
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      context.t('dashboard.title'),
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                    if (context.t('dashboard.subtitle').isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        context.t('dashboard.subtitle'),
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                            ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              // Seletor de visão
-              DashboardViewSelector(isMobile: isMobile),
-            ],
-          ),
-        ],
-      ),
+    return PageHeader(
+      title: context.t('dashboard.title'),
+      subtitle: context.t('dashboard.subtitle').isNotEmpty 
+          ? context.t('dashboard.subtitle')
+          : null,
+      actions: [
+        // Seletor de visão
+        DashboardViewSelector(isMobile: isMobile),
+        const SizedBox(width: AppSpacing.md),
+        // Filtro de período
+        const PeriodFilter(),
+      ],
     );
   }
 
@@ -685,21 +621,21 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             previousValue: previousIncome,
             insight: _getInsightForWidget('kpi_income'),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
           KpiMainCard(
             type: KpiType.expense,
             value: summary.expenses,
             previousValue: previousExpense,
             insight: _getInsightForWidget('kpi_expense'),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
           KpiMainCard(
             type: KpiType.net,
             value: summary.net,
             previousValue: previousNet,
             insight: _getInsightForWidget('kpi_net'),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
           KpiMainCard(
             type: KpiType.percentage,
             value: percentage,
@@ -710,62 +646,100 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
       );
     }
 
-    // Desktop/Tablet: grid 2x2 usando Row/Column em vez de GridView para evitar problemas de constraints
+    // Desktop/Tablet: Grid responsivo
     return LayoutBuilder(
       builder: (context, constraints) {
-        final cardWidth = (constraints.maxWidth - 16) / 2;
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-      children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: cardWidth,
-                  child: KpiMainCard(
-          type: KpiType.income,
-          value: summary.income,
-          previousValue: previousIncome,
-                    insight: _getInsightForWidget('kpi_income'),
-                  ),
+        final width = constraints.maxWidth;
+        final isTablet = width >= 768 && width < 1200;
+        final isDesktop = width >= 1200;
+        
+        final spacing = AppSpacing.md;
+        final crossAxisCount = isDesktop ? 4 : (isTablet ? 2 : 1);
+        
+        if (crossAxisCount == 1) {
+          // Mobile: coluna única
+          return Column(
+            children: [
+              KpiMainCard(
+                type: KpiType.income,
+                value: summary.income,
+                previousValue: previousIncome,
+                insight: _getInsightForWidget('kpi_income'),
+              ),
+              SizedBox(height: spacing),
+              KpiMainCard(
+                type: KpiType.expense,
+                value: summary.expenses,
+                previousValue: previousExpense,
+                insight: _getInsightForWidget('kpi_expense'),
+              ),
+              SizedBox(height: spacing),
+              KpiMainCard(
+                type: KpiType.net,
+                value: summary.net,
+                previousValue: previousNet,
+                insight: _getInsightForWidget('kpi_net'),
+              ),
+              SizedBox(height: spacing),
+              KpiMainCard(
+                type: KpiType.percentage,
+                value: percentage,
+                previousValue: previousPercentage,
+                insight: _getInsightForWidget('kpi_percentage'),
+              ),
+            ],
+          );
+        }
+        
+        // Desktop/Tablet: Grid usando Row com Expanded para evitar problemas de constraints
+        final itemWidth = (width - (spacing * (crossAxisCount - 1))) / crossAxisCount;
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(right: spacing),
+                child: KpiMainCard(
+                  type: KpiType.income,
+                  value: summary.income,
+                  previousValue: previousIncome,
+                  insight: _getInsightForWidget('kpi_income'),
                 ),
-                const SizedBox(width: 16),
-                SizedBox(
-                  width: cardWidth,
+              ),
+            ),
+            if (crossAxisCount >= 2)
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(right: crossAxisCount > 2 ? spacing : 0),
                   child: KpiMainCard(
-          type: KpiType.expense,
-          value: summary.expenses,
-          previousValue: previousExpense,
+                    type: KpiType.expense,
+                    value: summary.expenses,
+                    previousValue: previousExpense,
                     insight: _getInsightForWidget('kpi_expense'),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: cardWidth,
+              ),
+            if (crossAxisCount >= 3)
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(right: crossAxisCount > 3 ? spacing : 0),
                   child: KpiMainCard(
-          type: KpiType.net,
-          value: summary.net,
-          previousValue: previousNet,
+                    type: KpiType.net,
+                    value: summary.net,
+                    previousValue: previousNet,
                     insight: _getInsightForWidget('kpi_net'),
                   ),
                 ),
-                const SizedBox(width: 16),
-                SizedBox(
-                  width: cardWidth,
-                  child: KpiMainCard(
-          type: KpiType.percentage,
-          value: percentage,
-          previousValue: previousPercentage,
-                    insight: _getInsightForWidget('kpi_percentage'),
-                  ),
+              ),
+            if (crossAxisCount >= 4)
+              Expanded(
+                child: KpiMainCard(
+                  type: KpiType.percentage,
+                  value: percentage,
+                  previousValue: previousPercentage,
+                  insight: _getInsightForWidget('kpi_percentage'),
                 ),
-              ],
-            ),
+              ),
           ],
         );
       },
@@ -948,13 +922,9 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     final isMobile = ResponsiveUtils.isMobile(context);
 
           // Bar Chart - Receitas x Despesas
-    final barChart = Card(
-            elevation: 3,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
+    final barChart = AccessibleCard(
             child: Padding(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(AppSpacing.lg),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -963,17 +933,22 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                     children: [
                       Row(
                         children: [
-                          Icon(
-                            Icons.bar_chart,
-                            color: Theme.of(context).colorScheme.primary,
-                            size: 24,
+                          Container(
+                            padding: const EdgeInsets.all(AppSpacing.xs),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(AppBorders.smallRadius),
+                            ),
+                            child: Icon(
+                              Icons.bar_chart,
+                              color: AppColors.primary,
+                              size: 20,
+                            ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: AppSpacing.sm),
                           Text(
                             'Receitas x Despesas',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                            style: AppTypography.sectionTitle,
                           ),
                         ],
                       ),
@@ -982,14 +957,17 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                         child: Icon(
                           Icons.info_outline,
                           size: 18,
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                          color: AppColors.textTertiary,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    height: 250,
+                  const SizedBox(height: AppSpacing.lg),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      minHeight: 250,
+                      maxHeight: 320,
+                    ),
                     child: IncomeExpenseBarChart(
                       data: _data!.monthlyIncomeExpense,
                       onBarTap: _navigateToTransactionsMonth,
@@ -1001,35 +979,39 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     );
 
                 // Donut Chart - Receitas por Categoria
-    final incomeDonutChart = Card(
-                  elevation: 3,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
+    final incomeDonutChart = AccessibleCard(
                   child: Padding(
-                    padding: const EdgeInsets.all(20),
+                    padding: EdgeInsets.all(AppSpacing.lg),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            Icon(
-                              Icons.pie_chart,
-                              color: Colors.green,
-                              size: 24,
+                            Container(
+                              padding: const EdgeInsets.all(AppSpacing.xs),
+                              decoration: BoxDecoration(
+                                color: AppColors.income.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(AppBorders.smallRadius),
+                              ),
+                              child: Icon(
+                                Icons.pie_chart,
+                                color: AppColors.income,
+                                size: 20,
+                              ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: AppSpacing.sm),
                             Text(
                               'Receitas por Categoria',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                              style: AppTypography.cardTitle,
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          height: 200,
+                        const SizedBox(height: AppSpacing.md),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            minHeight: 200,
+                            maxHeight: 250,
+                          ),
                           child: TopCategoriesDonutChart(
                             categories: _data!.topCategories.income.take(5).toList(),
                             onSliceTap: (categoryId) {
@@ -1050,35 +1032,39 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     );
 
               // Donut Chart - Despesas por Categoria
-    final expenseDonutChart = Card(
-                  elevation: 3,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
+    final expenseDonutChart = AccessibleCard(
                   child: Padding(
-                    padding: const EdgeInsets.all(20),
+                    padding: EdgeInsets.all(AppSpacing.lg),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            Icon(
-                              Icons.pie_chart,
-                              color: Colors.red,
-                              size: 24,
+                            Container(
+                              padding: const EdgeInsets.all(AppSpacing.xs),
+                              decoration: BoxDecoration(
+                                color: AppColors.expense.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(AppBorders.smallRadius),
+                              ),
+                              child: Icon(
+                                Icons.pie_chart,
+                                color: AppColors.expense,
+                                size: 20,
+                              ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: AppSpacing.sm),
                             Text(
                               'Despesas por Categoria',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                              style: AppTypography.cardTitle,
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          height: 200,
+                        const SizedBox(height: AppSpacing.md),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            minHeight: 200,
+                            maxHeight: 250,
+                          ),
                           child: TopCategoriesDonutChart(
                             categories: _data!.topCategories.expenses.take(5).toList(),
                             onSliceTap: _navigateToTransactionsCategory,
@@ -1158,20 +1144,35 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
 
   Widget _buildRecentTransactions() {
     final currencyState = ref.watch(currencyProvider);
-    return Card(
+    return AccessibleCard(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(AppSpacing.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Transações Recentes',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.xs),
+                      decoration: BoxDecoration(
+                        color: AppColors.info.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(AppBorders.smallRadius),
                       ),
+                      child: Icon(
+                        Icons.swap_horiz,
+                        color: AppColors.info,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Text(
+                      'Transações Recentes',
+                      style: AppTypography.sectionTitle,
+                    ),
+                  ],
                 ),
                 TextButton(
                   onPressed: () {
@@ -1182,40 +1183,46 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                       '/app/transactions?from=${last30Days.toIso8601String().split('T')[0]}&to=${today.toIso8601String().split('T')[0]}',
                     );
                   },
-                  child: const Text('Ver tudo'),
+                  child: Text(
+                    'Ver tudo',
+                    style: AppTypography.label,
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
             if (_data!.recentTransactions.isEmpty)
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.all(AppSpacing.lg),
                 child: Center(
                   child: Text(
                     'Nenhuma transação encontrada',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                        ),
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: AppColors.textTertiary,
+                    ),
                   ),
                 ),
               )
             else
               ..._data!.recentTransactions.take(10).map((transaction) {
-                return ListItemCard(
-                  title: transaction.description,
-                  subtitle:
-                      '${transaction.account?.name ?? "Sem conta"} • ${_formatDate(transaction.occurredAt)}',
-                  trailing: Text(
-                    _formatCurrency(transaction.amount, currencyState),
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: _getAmountColor(transaction.amount, transaction.type),
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: ListItemCard(
+                    title: transaction.description,
+                    subtitle:
+                        '${transaction.account?.name ?? "Sem conta"} • ${_formatDate(transaction.occurredAt)}',
+                    trailing: Text(
+                      _formatCurrency(transaction.amount, currencyState),
+                      style: AppTypography.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: _getAmountColor(transaction.amount, transaction.type),
+                      ),
                     ),
+                    leadingIcon:
+                        transaction.type == 'income' ? Icons.arrow_downward : Icons.arrow_upward,
+                    leadingColor: _getAmountColor(transaction.amount, transaction.type),
+                    onTap: () => context.go('/app/transactions?id=${transaction.id}'),
                   ),
-                  leadingIcon:
-                      transaction.type == 'income' ? Icons.arrow_downward : Icons.arrow_upward,
-                  leadingColor: _getAmountColor(transaction.amount, transaction.type),
-                  onTap: () => context.go('/app/transactions?id=${transaction.id}'),
                 );
               }),
           ],
@@ -1355,40 +1362,61 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Saldos das Contas',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.xs),
+                      decoration: BoxDecoration(
+                        color: AppColors.secondary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(AppBorders.smallRadius),
                       ),
+                      child: Icon(
+                        Icons.account_balance_wallet,
+                        color: AppColors.secondary,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Text(
+                      'Saldos das Contas',
+                      style: AppTypography.sectionTitle,
+                    ),
+                  ],
                 ),
                 TextButton(
                   onPressed: () {
                     TelemetryService.logAction('dashboard.widget.view_all.clicked', metadata: {'widget': 'accounts'});
                     context.go('/app/accounts');
                   },
-                  child: const Text('Ver tudo'),
+                  child: Text(
+                    'Ver tudo',
+                    style: AppTypography.label,
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
             if (_data!.accountBalances.isEmpty)
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.all(AppSpacing.lg),
                 child: Center(
                   child: Column(
                     children: [
                       Text(
                         'Nenhuma conta encontrada',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                            ),
+                        style: AppTypography.bodyMedium.copyWith(
+                          color: AppColors.textTertiary,
+                        ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: AppSpacing.sm),
                       if (RbacHelper.canEdit(ref.read(authProvider)))
                         OutlinedButton.icon(
                           onPressed: () => context.go('/app/accounts'),
                           icon: const Icon(Icons.add, size: 16),
-                          label: const Text('Criar conta'),
+                          label: Text(
+                            'Criar conta',
+                            style: AppTypography.label,
+                          ),
                         ),
                     ],
                   ),
@@ -1396,19 +1424,23 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
               )
             else
               ..._data!.accountBalances.map((account) {
-                return ListItemCard(
-                  title: account.name,
-                  subtitle: 'Conta',
-                  trailing: Text(
-                    _formatCurrency(account.balance, currencyState),
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: account.balance >= 0 ? Colors.green : Colors.red,
+                final isPositive = account.balance >= 0;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: ListItemCard(
+                    title: account.name,
+                    subtitle: 'Saldo atual',
+                    trailing: Text(
+                      _formatCurrency(account.balance, currencyState),
+                      style: AppTypography.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: isPositive ? AppColors.income : AppColors.expense,
+                      ),
                     ),
+                    leadingIcon: Icons.account_balance_wallet,
+                    leadingColor: isPositive ? AppColors.income : AppColors.expense,
+                    onTap: () => context.go('/app/accounts/${account.id}'),
                   ),
-                  leadingIcon: Icons.account_balance_wallet,
-                  leadingColor: account.balance >= 0 ? Colors.green : Colors.red,
-                  onTap: () => context.go('/app/accounts/${account.id}'),
                 );
               }),
           ],
@@ -1431,10 +1463,9 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
       (sum, item) => sum + item.amount,
     );
 
-    return Card(
-      elevation: 2,
+    return AccessibleCard(
       child: Padding(
-      padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(AppSpacing.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1443,17 +1474,22 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
               children: [
                 Row(
                   children: [
-                    Icon(
-                      Icons.notifications_active,
-                      color: Theme.of(context).colorScheme.primary,
-                      size: 24,
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.xs),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(AppBorders.smallRadius),
+                      ),
+                      child: Icon(
+                        Icons.notifications_active,
+                        color: AppColors.warning,
+                        size: 20,
+                      ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: AppSpacing.sm),
                     Text(
                       'Alertas Recentes',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                      style: AppTypography.sectionTitle,
                     ),
                   ],
                 ),
@@ -1463,132 +1499,152 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                     context.go('/app/due-items');
                   },
                   icon: const Icon(Icons.arrow_forward, size: 16),
-                  label: const Text('Ver tudo'),
+                  label: Text(
+                    'Ver tudo',
+                    style: AppTypography.label,
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.md),
             // Itens Vencidos
             if (overdueCount > 0) ...[
-              InkWell(
-        onTap: () {
-                  TelemetryService.logAction('dashboard.alerts.overdue.clicked');
-          context.go('/app/due-items?status=overdue');
-        },
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red.shade300, width: 1),
-                  ),
-        child: Row(
-          children: [
-            Container(
-                        padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.red,
-                          borderRadius: BorderRadius.circular(8),
-              ),
-                        child: const Icon(Icons.warning, color: Colors.white, size: 20),
-            ),
-                      const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                              '$overdueCount ${overdueCount == 1 ? 'item vencido' : 'itens vencidos'}',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.red.shade900,
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    TelemetryService.logAction('dashboard.alerts.overdue.clicked');
+                    context.go('/app/due-items?status=overdue');
+                  },
+                  borderRadius: BorderRadius.circular(AppBorders.inputRadius),
+                  child: Container(
+                    padding: EdgeInsets.all(AppSpacing.md),
+                    decoration: BoxDecoration(
+                      color: AppColors.error.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(AppBorders.inputRadius),
+                      border: Border.all(
+                        color: AppColors.error.withOpacity(0.3),
+                        width: AppBorders.borderWidth,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.sm),
+                          decoration: BoxDecoration(
+                            color: AppColors.error,
+                            borderRadius: BorderRadius.circular(AppBorders.smallRadius),
+                          ),
+                          child: const Icon(Icons.warning, color: Colors.white, size: 20),
                         ),
-                  ),
-                            const SizedBox(height: 2),
-                  Text(
-                              'Total: ${_formatCurrency(overdueTotal, currencyState)}',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.red.shade700,
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '$overdueCount ${overdueCount == 1 ? 'item vencido' : 'itens vencidos'}',
+                                style: AppTypography.cardTitle.copyWith(
+                                  color: AppColors.error,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.xs / 2),
+                              Text(
+                                'Total: ${_formatCurrency(overdueTotal, currencyState)}',
+                                style: AppTypography.bodyMedium.copyWith(
+                                  color: AppColors.error.withOpacity(0.8),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                  ),
-                ],
-              ),
-            ),
-                      const Icon(Icons.chevron_right, color: Colors.red),
-                    ],
+                        Icon(Icons.chevron_right, color: AppColors.error),
+                      ],
+                    ),
                   ),
                 ),
               ),
-              if (upcomingCount > 0) const SizedBox(height: 12),
+              if (upcomingCount > 0) const SizedBox(height: AppSpacing.md),
             ],
             // Próximos Vencimentos
             if (upcomingCount > 0) ...[
-              InkWell(
-                onTap: () {
-                  final today = DateTime.now();
-                  final nextWeek = today.add(const Duration(days: 7));
-                  TelemetryService.logAction('dashboard.alerts.upcoming.clicked');
-                  context.go(
-                    '/app/due-items?from=${today.toIso8601String().split('T')[0]}&to=${nextWeek.toIso8601String().split('T')[0]}',
-                  );
-                },
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange.shade300, width: 1),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.orange,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(Icons.schedule, color: Colors.white, size: 20),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    final today = DateTime.now();
+                    final nextWeek = today.add(const Duration(days: 7));
+                    TelemetryService.logAction('dashboard.alerts.upcoming.clicked');
+                    context.go(
+                      '/app/due-items?from=${today.toIso8601String().split('T')[0]}&to=${nextWeek.toIso8601String().split('T')[0]}',
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(AppBorders.inputRadius),
+                  child: Container(
+                    padding: EdgeInsets.all(AppSpacing.md),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(AppBorders.inputRadius),
+                      border: Border.all(
+                        color: AppColors.warning.withOpacity(0.3),
+                        width: AppBorders.borderWidth,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '$upcomingCount ${upcomingCount == 1 ? 'próximo vencimento' : 'próximos vencimentos'}',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.orange.shade900,
-                                  ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Total: ${_formatCurrency(upcomingTotal, currencyState)}',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Colors.orange.shade700,
-                                  ),
-                            ),
-                          ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.sm),
+                          decoration: BoxDecoration(
+                            color: AppColors.warning,
+                            borderRadius: BorderRadius.circular(AppBorders.smallRadius),
+                          ),
+                          child: const Icon(Icons.schedule, color: Colors.white, size: 20),
                         ),
-                      ),
-                      const Icon(Icons.chevron_right, color: Colors.orange),
-                    ],
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '$upcomingCount ${upcomingCount == 1 ? 'próximo vencimento' : 'próximos vencimentos'}',
+                                style: AppTypography.cardTitle.copyWith(
+                                  color: AppColors.warning,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.xs / 2),
+                              Text(
+                                'Total: ${_formatCurrency(upcomingTotal, currencyState)}',
+                                style: AppTypography.bodyMedium.copyWith(
+                                  color: AppColors.warning.withOpacity(0.8),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.chevron_right, color: AppColors.warning),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ],
             // Link para notificações
-            const SizedBox(height: 12),
-            TextButton.icon(
-              onPressed: () {
-                TelemetryService.logAction('dashboard.alerts.notifications.clicked');
-                context.go('/app/notifications');
-              },
-              icon: const Icon(Icons.notifications, size: 18),
-              label: const Text('Ver todas as notificações'),
-            ),
+            if (overdueCount > 0 || upcomingCount > 0) ...[
+              const SizedBox(height: AppSpacing.md),
+              TextButton.icon(
+                onPressed: () {
+                  TelemetryService.logAction('dashboard.alerts.notifications.clicked');
+                  context.go('/app/notifications');
+                },
+                icon: Icon(Icons.notifications, size: 18, color: AppColors.textSecondary),
+                label: Text(
+                  'Ver todas as notificações',
+                  style: AppTypography.label.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),

@@ -114,7 +114,13 @@ class _ReorderableDashboardGridState extends ConsumerState<ReorderableDashboardG
               bottom: 16,
               top: index == 0 ? ResponsiveUtils.getResponsivePadding(context).top : 0,
             ),
-            child: widgetItem,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: 100, // Altura mínima para evitar widgets sem tamanho
+                minWidth: double.infinity,
+              ),
+              child: widgetItem,
+            ),
           );
         }).toList(),
       );
@@ -124,7 +130,9 @@ class _ReorderableDashboardGridState extends ConsumerState<ReorderableDashboardG
     // Em vez de SliverGrid com childAspectRatio fixo, usar uma abordagem mais flexível
     return LayoutBuilder(
       builder: (context, constraints) {
-        final width = constraints.maxWidth;
+        final width = constraints.maxWidth.isFinite && constraints.maxWidth > 0
+            ? constraints.maxWidth
+            : MediaQuery.of(context).size.width;
         final isTablet = width >= 768 && width < 1200;
         final isDesktop = width >= 1200;
         
@@ -139,9 +147,13 @@ class _ReorderableDashboardGridState extends ConsumerState<ReorderableDashboardG
         return SingleChildScrollView(
           padding: ResponsiveUtils.getResponsivePadding(context),
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: width),
+            constraints: BoxConstraints(
+              minWidth: width,
+              maxWidth: width,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 // Organizar widgets em linhas responsivas
                 ..._buildResponsiveRows(
@@ -176,7 +188,14 @@ class _ReorderableDashboardGridState extends ConsumerState<ReorderableDashboardG
             bottom: 16,
             top: index == 0 ? 0 : 0,
           ),
-          child: widgetItem,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: maxWidth,
+              maxWidth: maxWidth,
+              minHeight: 100, // Altura mínima para evitar widgets sem tamanho
+            ),
+            child: widgetItem,
+          ),
         );
       }).toList();
     }
@@ -196,7 +215,12 @@ class _ReorderableDashboardGridState extends ConsumerState<ReorderableDashboardG
               padding: EdgeInsets.only(
                 right: j < crossAxisCount - 1 ? spacing : 0,
               ),
-              child: widgets[index],
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  minHeight: 100, // Altura mínima para evitar widgets sem tamanho
+                ),
+                child: widgets[index],
+              ),
             ),
           ),
         );

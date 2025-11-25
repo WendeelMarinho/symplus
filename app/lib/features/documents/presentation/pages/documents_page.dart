@@ -14,6 +14,12 @@ import '../../../../core/widgets/toast_service.dart';
 import '../../../../core/widgets/list_item_card.dart';
 import '../../../../core/widgets/confirm_dialog.dart';
 import '../../../../core/auth/auth_provider.dart';
+import '../../../../core/accessibility/responsive_utils.dart';
+import '../../../../core/design/app_colors.dart';
+import '../../../../core/design/app_typography.dart';
+import '../../../../core/design/app_spacing.dart';
+import '../../../../core/design/app_borders.dart';
+import '../../../../core/accessibility/accessible_widgets.dart';
 import '../../data/services/document_service.dart';
 import '../../data/models/document.dart';
 
@@ -442,11 +448,10 @@ class _DocumentsPageState extends ConsumerState<DocumentsPage> with SingleTicker
         PageHeader(
           title: 'Documentos',
           subtitle: 'Armazene e organize seus documentos financeiros',
-          breadcrumbs: const ['Vault', 'Documentos'],
           actions: [
             if (hasFilters)
               IconButton(
-                icon: const Icon(Icons.filter_alt),
+                icon: const Icon(Icons.clear),
                 onPressed: () {
                   setState(() {
                     _filterCategory = null;
@@ -455,10 +460,12 @@ class _DocumentsPageState extends ConsumerState<DocumentsPage> with SingleTicker
                   _loadDocuments();
                 },
                 tooltip: 'Remover filtros',
+                color: AppColors.textSecondary,
               ),
             PopupMenuButton<String>(
               icon: const Icon(Icons.filter_list),
               tooltip: 'Filtrar por categoria',
+              color: AppColors.textSecondary,
               onSelected: (value) {
                 setState(() {
                   _filterCategory = value == 'all' ? null : value;
@@ -477,16 +484,19 @@ class _DocumentsPageState extends ConsumerState<DocumentsPage> with SingleTicker
           ],
         ),
         // Barra de busca
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: AppSpacing.pagePadding(context).horizontal,
+            vertical: AppSpacing.sm,
+          ),
           child: TextField(
             controller: _searchController,
             decoration: InputDecoration(
               hintText: 'Buscar documentos por nome ou tipo...',
-              prefixIcon: const Icon(Icons.search),
+              prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
               suffixIcon: _searchController.text.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Icons.clear),
+                      icon: const Icon(Icons.clear, color: AppColors.textSecondary),
                       onPressed: () {
                         _searchController.clear();
                         setState(() {
@@ -498,19 +508,43 @@ class _DocumentsPageState extends ConsumerState<DocumentsPage> with SingleTicker
                     )
                   : null,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppBorders.inputRadius),
+                borderSide: BorderSide(color: AppColors.border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppBorders.inputRadius),
+                borderSide: BorderSide(color: AppColors.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppBorders.inputRadius),
+                borderSide: BorderSide(color: AppColors.primary, width: 2),
               ),
             ),
           ),
         ),
-        // Abas
-        TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Todos', icon: Icon(Icons.folder, size: 18)),
-            Tab(text: 'Por Tag', icon: Icon(Icons.label, size: 18)),
-            Tab(text: 'Recentes', icon: Icon(Icons.access_time, size: 18)),
-          ],
+        // Abas modernizadas
+        Container(
+          margin: EdgeInsets.symmetric(
+            horizontal: AppSpacing.pagePadding(context).horizontal,
+          ),
+          decoration: BoxDecoration(
+            color: AppColors.backgroundLight,
+            borderRadius: BorderRadius.circular(AppBorders.smallRadius),
+          ),
+          child: TabBar(
+            controller: _tabController,
+            indicator: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(AppBorders.smallRadius),
+            ),
+            labelColor: Colors.white,
+            unselectedLabelColor: AppColors.textSecondary,
+            tabs: const [
+              Tab(text: 'Todos', icon: Icon(Icons.folder, size: 18)),
+              Tab(text: 'Por Tag', icon: Icon(Icons.label, size: 18)),
+              Tab(text: 'Recentes', icon: Icon(Icons.access_time, size: 18)),
+            ],
+          ),
         ),
         ActionBar(
           actions: [
@@ -525,22 +559,26 @@ class _DocumentsPageState extends ConsumerState<DocumentsPage> with SingleTicker
         ),
         if (_isUploading)
           Container(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                LinearProgressIndicator(
-                  value: _uploadProgress,
-                  backgroundColor: Colors.grey[300],
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    Theme.of(context).colorScheme.primary,
-                  ),
+            padding: EdgeInsets.all(AppSpacing.pagePadding(context).horizontal),
+            child: AccessibleCard(
+              child: Padding(
+                padding: EdgeInsets.all(AppSpacing.md),
+                child: Column(
+                  children: [
+                    LinearProgressIndicator(
+                      value: _uploadProgress,
+                      backgroundColor: AppColors.backgroundLight,
+                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                      borderRadius: BorderRadius.circular(AppBorders.smallRadius),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      'Enviando... ${(_uploadProgress * 100).toStringAsFixed(0)}%',
+                      style: AppTypography.bodyMedium,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Enviando... ${(_uploadProgress * 100).toStringAsFixed(0)}%',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
+              ),
             ),
           ),
         Expanded(
@@ -568,29 +606,65 @@ class _DocumentsPageState extends ConsumerState<DocumentsPage> with SingleTicker
                             });
                             return _loadDocuments();
                           },
-                          child: ListView.builder(
-                            itemCount: _documents.length + (_hasMore ? 1 : 0),
-                            itemBuilder: (context, index) {
-                              if (index == _documents.length) {
-                                return Padding(
-                                  padding: const EdgeInsets.all(16.0),
-                                  child: Center(
-                                    child: TextButton(
-                                      onPressed: () {
-                                        setState(() {
-                                          _currentPage++;
-                                        });
-                                        _loadDocuments(showLoading: false);
-                                      },
-                                      child: const Text('Carregar mais'),
-                                    ),
+                          child: CustomScrollView(
+                            slivers: [
+                              // Card de upload (se não houver documentos ou no final)
+                              if (_documents.isEmpty && canEdit)
+                                SliverToBoxAdapter(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(AppSpacing.pagePadding(context).horizontal),
+                                    child: _buildUploadCard(),
                                   ),
-                                );
-                              }
+                                ),
+                              // Lista de documentos
+                              SliverPadding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.pagePadding(context).horizontal,
+                                  vertical: AppSpacing.md,
+                                ),
+                                sliver: SliverList(
+                                  delegate: SliverChildBuilderDelegate(
+                                    (context, index) {
+                                      if (index == _documents.length) {
+                                        return Column(
+                                          children: [
+                                            if (canEdit) ...[
+                                              const SizedBox(height: AppSpacing.md),
+                                              _buildUploadCard(),
+                                            ],
+                                            if (_hasMore) ...[
+                                              const SizedBox(height: AppSpacing.md),
+                                              Center(
+                                                child: OutlinedButton.icon(
+                                                  onPressed: () {
+                                                    setState(() {
+                                                      _currentPage++;
+                                                    });
+                                                    _loadDocuments(showLoading: false);
+                                                  },
+                                                  icon: const Icon(Icons.expand_more),
+                                                  label: Text(
+                                                    'Carregar mais',
+                                                    style: AppTypography.label,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        );
+                                      }
 
-                              final document = _documents[index];
-                              return _buildDocumentCard(context, document, canEdit);
-                            },
+                                      final document = _documents[index];
+                                      return Padding(
+                                        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                                        child: _buildDocumentCard(context, document, canEdit),
+                                      );
+                                    },
+                                    childCount: _documents.length + (_hasMore || canEdit ? 1 : 0),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
         ),
@@ -613,106 +687,218 @@ class _DocumentsPageState extends ConsumerState<DocumentsPage> with SingleTicker
     }
   }
 
-  Widget _buildDocumentCard(BuildContext context, Document document, bool canEdit) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: document.color.withOpacity(0.2),
-          child: Icon(
-            document.icon,
-            color: document.color,
-          ),
-        ),
-        title: Text(
-          document.name,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
+  /// Card de upload de documento
+  Widget _buildUploadCard() {
+    return AccessibleCard(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppBorders.cardRadius),
+          onTap: _isUploading ? null : _pickAndUploadFiles,
+          child: Container(
+            padding: EdgeInsets.all(AppSpacing.xl),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.secondary.withOpacity(0.1),
+                  AppColors.secondary.withOpacity(0.05),
+                ],
               ),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Wrap(
-              spacing: 8,
+              borderRadius: BorderRadius.circular(AppBorders.cardRadius),
+              border: Border.all(
+                color: AppColors.secondary.withOpacity(0.3),
+                width: 2,
+                style: BorderStyle.solid,
+              ),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                if (document.category != null)
-                  Chip(
-                    label: Text(
-                      _formatCategory(document.category!),
-                      style: const TextStyle(fontSize: 11),
-                    ),
-                    backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  decoration: BoxDecoration(
+                    color: AppColors.secondary,
+                    shape: BoxShape.circle,
                   ),
-                Text(
-                  document.sizeHuman,
-                  style: Theme.of(context).textTheme.bodySmall,
+                  child: _isUploading
+                      ? const SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Icon(
+                          Icons.cloud_upload,
+                          color: Colors.white,
+                          size: 32,
+                        ),
                 ),
+                const SizedBox(height: AppSpacing.md),
                 Text(
-                  DateFormat('dd/MM/yyyy').format(document.createdAt),
-                  style: Theme.of(context).textTheme.bodySmall,
+                  _isUploading ? 'Enviando documento...' : 'Fazer Upload de Documento',
+                  style: AppTypography.sectionTitle.copyWith(
+                    color: AppColors.secondary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  'Clique para selecionar e enviar arquivos',
+                  style: AppTypography.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
-          ],
+          ),
         ),
-        trailing: PopupMenuButton<String>(
-          icon: const Icon(Icons.more_vert),
-          tooltip: 'Ações',
-          onSelected: (value) {
-            switch (value) {
-              case 'copy_url':
-                _copyTemporaryUrl(document);
-                break;
-              case 'download':
-                _downloadDocument(document);
-                break;
-              case 'delete':
-                if (canEdit) {
-                  _deleteDocument(document);
-                }
-                break;
-            }
-          },
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: 'copy_url',
-              child: Row(
-                children: [
-                  Icon(Icons.link, size: 20),
-                  SizedBox(width: 8),
-                  Text('Copiar URL temporária'),
-                ],
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'download',
-              child: Row(
-                children: [
-                  Icon(Icons.download, size: 20),
-                  SizedBox(width: 8),
-                  Text('Download'),
-                ],
-              ),
-            ),
-            if (canEdit) ...[
-              const PopupMenuDivider(),
-              const PopupMenuItem(
-                value: 'delete',
-                child: Row(
-                  children: [
-                    Icon(Icons.delete, size: 20, color: Colors.red),
-                    SizedBox(width: 8),
-                    Text('Excluir', style: TextStyle(color: Colors.red)),
+      ),
+    );
+  }
+
+  Widget _buildDocumentCard(BuildContext context, Document document, bool canEdit) {
+    return AccessibleCard(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppBorders.cardRadius),
+          onTap: () => _downloadDocument(document),
+          child: Padding(
+            padding: EdgeInsets.all(AppSpacing.md),
+            child: Row(
+              children: [
+                // Ícone do documento
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    color: document.color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(AppBorders.smallRadius),
+                  ),
+                  child: Icon(
+                    document.icon,
+                    color: document.color,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                // Conteúdo
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        document.name,
+                        style: AppTypography.cardTitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: AppSpacing.xs / 2),
+                      Wrap(
+                        spacing: AppSpacing.sm,
+                        runSpacing: AppSpacing.xs / 2,
+                        children: [
+                          if (document.category != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.xs,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.backgroundLight,
+                                borderRadius: BorderRadius.circular(AppBorders.smallRadius),
+                              ),
+                              child: Text(
+                                _formatCategory(document.category!),
+                                style: AppTypography.caption.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          Text(
+                            document.sizeHuman,
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          Text(
+                            DateFormat('dd/MM/yyyy').format(document.createdAt),
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                // Menu de ações
+                PopupMenuButton<String>(
+                  icon: Icon(Icons.more_vert, color: AppColors.textSecondary, size: 20),
+                  tooltip: 'Ações',
+                  onSelected: (value) {
+                    switch (value) {
+                      case 'copy_url':
+                        _copyTemporaryUrl(document);
+                        break;
+                      case 'download':
+                        _downloadDocument(document);
+                        break;
+                      case 'delete':
+                        if (canEdit) {
+                          _deleteDocument(document);
+                        }
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'copy_url',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.link, size: 20),
+                          const SizedBox(width: AppSpacing.sm),
+                          Text('Copiar URL temporária', style: AppTypography.bodyMedium),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'download',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.download, size: 20),
+                          const SizedBox(width: AppSpacing.sm),
+                          Text('Download', style: AppTypography.bodyMedium),
+                        ],
+                      ),
+                    ),
+                    if (canEdit) ...[
+                      const PopupMenuDivider(),
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.delete, size: 20, color: AppColors.error),
+                            const SizedBox(width: AppSpacing.sm),
+                            Text(
+                              'Excluir',
+                              style: AppTypography.bodyMedium.copyWith(
+                                color: AppColors.error,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
-              ),
-            ],
-          ],
+              ],
+            ),
+          ),
         ),
-        onTap: () => _downloadDocument(document),
       ),
     );
   }

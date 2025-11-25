@@ -17,6 +17,12 @@ import '../../../../core/rbac/permission_helper.dart';
 import '../../../../core/rbac/permissions_catalog.dart';
 import '../../../../core/providers/currency_provider.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/accessibility/responsive_utils.dart';
+import '../../../../core/design/app_colors.dart';
+import '../../../../core/design/app_typography.dart';
+import '../../../../core/design/app_spacing.dart';
+import '../../../../core/design/app_borders.dart';
+import '../../../../core/accessibility/accessible_widgets.dart';
 import '../../data/services/transaction_service.dart';
 import '../../data/models/transaction.dart';
 import '../../../accounts/data/services/account_service.dart';
@@ -26,6 +32,7 @@ import '../../../categories/data/models/category.dart';
 import '../../../documents/data/services/document_service.dart';
 import 'package:file_picker/file_picker.dart';
 import '../widgets/transaction_document_upload.dart';
+import 'transaction_form_page.dart';
 
 class TransactionsPage extends ConsumerStatefulWidget {
   const TransactionsPage({super.key});
@@ -179,216 +186,32 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
   }
 
   void _showCreateDialog() {
-    final descriptionController = TextEditingController();
-    final amountController = TextEditingController();
-    final typeController = TextEditingController(text: 'expense');
-    DateTime? selectedDate = DateTime.now();
-    int? selectedAccountId;
-    int? selectedCategoryId;
-    PlatformFile? selectedFile;
-    final formKey = GlobalKey<FormState>();
-
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Nova Transação'),
-          content: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DropdownButtonFormField<String>(
-                    value: typeController.text,
-                    decoration: const InputDecoration(
-                      labelText: 'Tipo *',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 'expense', child: Text('Despesa')),
-                      DropdownMenuItem(value: 'income', child: Text('Receita')),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        typeController.text = value;
-                        setDialogState(() {});
-                      }
-                    },
-                    validator: (value) =>
-                        value?.isEmpty ?? true ? 'Tipo é obrigatório' : null,
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<int>(
-                    value: selectedAccountId,
-                    decoration: const InputDecoration(
-                      labelText: 'Conta *',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: _accounts.map((account) {
-                      return DropdownMenuItem(
-                        value: account.id,
-                        child: Text(account.name),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      selectedAccountId = value;
-                      setDialogState(() {});
-                    },
-                    validator: (value) =>
-                        value == null ? 'Conta é obrigatória' : null,
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<int>(
-                    value: selectedCategoryId,
-                    decoration: const InputDecoration(
-                      labelText: 'Categoria',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: [
-                      const DropdownMenuItem<int>(
-                        value: null,
-                        child: Text('Sem categoria'),
-                      ),
-                      ..._categories.map((category) {
-                        return DropdownMenuItem(
-                          value: category.id,
-                          child: Text(category.name),
-                        );
-                      }),
-                    ],
-                    onChanged: (value) {
-                      selectedCategoryId = value;
-                      setDialogState(() {});
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: descriptionController,
-                    decoration: const InputDecoration(
-                      labelText: 'Descrição *',
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (value) =>
-                        value?.isEmpty ?? true ? 'Descrição é obrigatória' : null,
-                    autofocus: true,
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: amountController,
-                    decoration: const InputDecoration(
-                      labelText: 'Valor *',
-                      border: OutlineInputBorder(),
-                      prefixText: 'R\$ ',
-                    ),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    validator: (value) {
-                      if (value?.isEmpty ?? true) return 'Valor é obrigatório';
-                      if (double.tryParse(value!.replaceAll(',', '.')) == null ||
-                          double.parse(value.replaceAll(',', '.')) <= 0) {
-                        return 'Valor inválido';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  InkWell(
-                    onTap: () async {
-                      final date = await showDatePicker(
-                        context: context,
-                        initialDate: selectedDate ?? DateTime.now(),
-                        firstDate: DateTime(2000),
-                        lastDate: DateTime.now(),
-                      );
-                      if (date != null) {
-                        selectedDate = date;
-                        setDialogState(() {});
-                      }
-                    },
-                    child: InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'Data da Transação *',
-                        border: OutlineInputBorder(),
-                        suffixIcon: Icon(Icons.calendar_today),
-                      ),
-                      child: Text(
-                        selectedDate != null
-                            ? DateFormat('dd/MM/yyyy').format(selectedDate!)
-                            : 'Selecione uma data',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // Upload de documento (opcional)
-                  TransactionDocumentUpload(
-                    required: false,
-                    onFileSelected: (file) {
-                      selectedFile = file;
-                      setDialogState(() {});
-                    },
-                  ),
-                ],
-              ),
-            ),
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        insetPadding: ResponsiveUtils.isMobile(context)
+            ? const EdgeInsets.all(16)
+            : const EdgeInsets.symmetric(horizontal: 100, vertical: 50),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: ResponsiveUtils.isMobile(context) ? double.infinity : 600,
+            maxHeight: MediaQuery.of(context).size.height * 0.9,
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                // Dispose controllers após fechar o diálogo
-                Future.microtask(() {
-                  descriptionController.dispose();
-                  amountController.dispose();
-                  typeController.dispose();
-                });
-              },
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                if (formKey.currentState!.validate() &&
-                    selectedAccountId != null &&
-                    selectedDate != null) {
-                  // Salvar valores antes de fechar
-                  final accountId = selectedAccountId!;
-                  final categoryId = selectedCategoryId;
-                  final type = typeController.text;
-                  final amount = double.parse(amountController.text.replaceAll(',', '.'));
-                  final occurredAt = selectedDate!;
-                  final description = descriptionController.text;
-                  final file = selectedFile;
-                  
-                  // Fechar diálogo primeiro (usando contexto do diálogo)
-                  Navigator.of(context).pop();
-                  
-                  // Aguardar um frame para garantir que o diálogo foi fechado
-                  await Future.delayed(const Duration(milliseconds: 100));
-                  
-                  // Dispose controllers após fechar
-                  descriptionController.dispose();
-                  amountController.dispose();
-                  typeController.dispose();
-                  
-                  // Criar transação com valores salvos (usando contexto do widget pai)
-                  if (mounted) {
-                    await _createTransaction(
-                      accountId: accountId,
-                      categoryId: categoryId,
-                      type: type,
-                      amount: amount,
-                      occurredAt: occurredAt,
-                      description: description,
-                      file: file,
-                    );
-                  }
-                }
-              },
-              child: const Text('Criar'),
-            ),
-          ],
+          child: TransactionFormPage(
+            transaction: null,
+            transactionId: null,
+          ),
         ),
       ),
-    );
+    ).then((result) {
+      if (result == true && mounted) {
+        setState(() {
+          _currentPage = 1;
+        });
+        _loadTransactions();
+      }
+    });
   }
 
   Future<void> _createTransaction({
@@ -468,200 +291,32 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
   }
 
   void _showEditDialog(Transaction transaction) {
-    final descriptionController = TextEditingController(text: transaction.description);
-    final amountController = TextEditingController(text: transaction.amount.toString());
-    final typeController = TextEditingController(text: transaction.type);
-    DateTime? selectedDate = transaction.occurredAt;
-    int? selectedAccountId = transaction.accountId;
-    int? selectedCategoryId = transaction.categoryId;
-    final formKey = GlobalKey<FormState>();
-
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Editar Transação'),
-          content: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DropdownButtonFormField<String>(
-                    value: typeController.text,
-                    decoration: const InputDecoration(
-                      labelText: 'Tipo *',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 'expense', child: Text('Despesa')),
-                      DropdownMenuItem(value: 'income', child: Text('Receita')),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        typeController.text = value;
-                        setDialogState(() {});
-                      }
-                    },
-                    validator: (value) =>
-                        value?.isEmpty ?? true ? 'Tipo é obrigatório' : null,
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<int>(
-                    value: selectedAccountId,
-                    decoration: const InputDecoration(
-                      labelText: 'Conta *',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: _accounts.map((account) {
-                      return DropdownMenuItem(
-                        value: account.id,
-                        child: Text(account.name),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      selectedAccountId = value;
-                      setDialogState(() {});
-                    },
-                    validator: (value) =>
-                        value == null ? 'Conta é obrigatória' : null,
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<int>(
-                    value: selectedCategoryId,
-                    decoration: const InputDecoration(
-                      labelText: 'Categoria',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: [
-                      const DropdownMenuItem<int>(
-                        value: null,
-                        child: Text('Sem categoria'),
-                      ),
-                      ..._categories.map((category) {
-                        return DropdownMenuItem(
-                          value: category.id,
-                          child: Text(category.name),
-                        );
-                      }),
-                    ],
-                    onChanged: (value) {
-                      selectedCategoryId = value;
-                      setDialogState(() {});
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: descriptionController,
-                    decoration: const InputDecoration(
-                      labelText: 'Descrição *',
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (value) =>
-                        value?.isEmpty ?? true ? 'Descrição é obrigatória' : null,
-                    autofocus: true,
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: amountController,
-                    decoration: const InputDecoration(
-                      labelText: 'Valor *',
-                      border: OutlineInputBorder(),
-                      prefixText: 'R\$ ',
-                    ),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    validator: (value) {
-                      if (value?.isEmpty ?? true) return 'Valor é obrigatório';
-                      if (double.tryParse(value!.replaceAll(',', '.')) == null ||
-                          double.parse(value.replaceAll(',', '.')) <= 0) {
-                        return 'Valor inválido';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  InkWell(
-                    onTap: () async {
-                      final date = await showDatePicker(
-                        context: context,
-                        initialDate: selectedDate ?? DateTime.now(),
-                        firstDate: DateTime(2000),
-                        lastDate: DateTime.now(),
-                      );
-                      if (date != null) {
-                        selectedDate = date;
-                        setDialogState(() {});
-                      }
-                    },
-                    child: InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'Data da Transação *',
-                        border: OutlineInputBorder(),
-                        suffixIcon: Icon(Icons.calendar_today),
-                      ),
-                      child: Text(
-                        selectedDate != null
-                            ? DateFormat('dd/MM/yyyy').format(selectedDate!)
-                            : 'Selecione uma data',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        insetPadding: ResponsiveUtils.isMobile(context)
+            ? const EdgeInsets.all(16)
+            : const EdgeInsets.symmetric(horizontal: 100, vertical: 50),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: ResponsiveUtils.isMobile(context) ? double.infinity : 600,
+            maxHeight: MediaQuery.of(context).size.height * 0.9,
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                // Dispose controllers após fechar o diálogo
-                Future.microtask(() {
-                  descriptionController.dispose();
-                  amountController.dispose();
-                  typeController.dispose();
-                });
-              },
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                if (formKey.currentState!.validate() &&
-                    selectedAccountId != null &&
-                    selectedDate != null) {
-                  // Salvar valores antes de fechar
-                  final accountId = selectedAccountId!;
-                  final categoryId = selectedCategoryId;
-                  final type = typeController.text;
-                  final amount = double.parse(amountController.text.replaceAll(',', '.'));
-                  final occurredAt = selectedDate!;
-                  final description = descriptionController.text;
-                  
-                  // Fechar diálogo primeiro
-                  Navigator.of(context).pop();
-                  // Dispose controllers após fechar
-                  Future.microtask(() {
-                    descriptionController.dispose();
-                    amountController.dispose();
-                    typeController.dispose();
-                  });
-                  // Atualizar transação com valores salvos
-                  await _updateTransaction(
-                    transaction.id,
-                    accountId: accountId,
-                    categoryId: categoryId,
-                    type: type,
-                    amount: amount,
-                    occurredAt: occurredAt,
-                    description: description,
-                  );
-                }
-              },
-              child: const Text('Salvar'),
-            ),
-          ],
+          child: TransactionFormPage(
+            transaction: transaction,
+            transactionId: null,
+          ),
         ),
       ),
-    );
+    ).then((result) {
+      if (result == true && mounted) {
+        setState(() {
+          _currentPage = 1;
+        });
+        _loadTransactions();
+      }
+    });
   }
 
   Future<void> _updateTransaction(
@@ -903,6 +558,37 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
     return DateFormat('dd/MM/yyyy').format(date);
   }
 
+  String _formatDateHeader(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final dateOnly = DateTime(date.year, date.month, date.day);
+
+    if (dateOnly == today) {
+      return 'Hoje';
+    } else if (dateOnly == yesterday) {
+      return 'Ontem';
+    } else {
+      return DateFormat('EEEE, dd/MM/yyyy', 'pt_BR').format(date);
+    }
+  }
+
+  /// Agrupa transações por data
+  Map<String, List<Transaction>> _groupTransactionsByDate(List<Transaction> transactions) {
+    final grouped = <String, List<Transaction>>{};
+    for (final transaction in transactions) {
+      final dateKey = DateFormat('yyyy-MM-dd').format(transaction.occurredAt);
+      grouped.putIfAbsent(dateKey, () => []).add(transaction);
+    }
+    // Ordenar por data (mais recente primeiro)
+    final sortedKeys = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
+    final sorted = <String, List<Transaction>>{};
+    for (final key in sortedKeys) {
+      sorted[key] = grouped[key]!;
+    }
+    return sorted;
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
@@ -916,7 +602,7 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
         _filterFrom != null ||
         _filterTo != null ||
         (_searchQuery?.isNotEmpty ?? false);
-    final isMobile = MediaQuery.of(context).size.width < 600;
+    final isMobile = ResponsiveUtils.isMobile(context);
 
     return KeyboardListener(
       focusNode: _keyboardFocusNode,
@@ -941,7 +627,7 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
       child: Focus(
         autofocus: true,
         child: Column(
-      children: [
+          children: [
         PageHeader(
           title: 'Transações',
           subtitle: 'Visualize e gerencie todas as suas transações financeiras',
@@ -962,37 +648,56 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                   _loadTransactions();
                 },
                 tooltip: 'Limpar filtros',
+                color: AppColors.textSecondary,
               ),
             IconButton(
               icon: const Icon(Icons.filter_list),
               onPressed: _showFilterDialog,
               tooltip: 'Filtrar',
+              color: AppColors.textSecondary,
             ),
           ],
         ),
         // Barra de busca
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'Buscar transações...',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: _searchController.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        _searchController.clear();
-                        setState(() {
-                          _searchQuery = null;
-                          _currentPage = 1;
-                        });
-                        _loadTransactions();
-                      },
-                    )
-                  : null,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+        Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: AppSpacing.pagePadding(context).horizontal,
+            vertical: AppSpacing.sm,
+          ),
+          child: SizedBox(
+            width: double.infinity,
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Buscar transações...',
+                prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, color: AppColors.textSecondary),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() {
+                            _searchQuery = null;
+                            _currentPage = 1;
+                          });
+                          _loadTransactions();
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppBorders.inputRadius),
+                  borderSide: BorderSide(color: AppColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppBorders.inputRadius),
+                  borderSide: BorderSide(color: AppColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppBorders.inputRadius),
+                  borderSide: BorderSide(color: AppColors.primary, width: 2),
+                ),
+                filled: true,
+                fillColor: AppColors.surface,
               ),
             ),
           ),
@@ -1026,121 +731,321 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                           actionLabel: 'Nova Transação',
                           onAction: canCreate ? _showCreateDialog : null,
                         )
-                      : RefreshIndicator(
-                          onRefresh: () {
-                            setState(() {
-                              _currentPage = 1;
-                            });
-                            return _loadTransactions();
-                          },
-                          child: isMobile
-                              ? ListView.builder(
-                                  itemCount: _transactions.length + (_hasMore ? 1 : 0),
-                                  itemBuilder: (context, index) {
-                                    if (index == _transactions.length) {
-                                      return Padding(
-                                        padding: const EdgeInsets.all(16.0),
-                                        child: Center(
-                                          child: TextButton(
-                                            onPressed: () {
-                                              setState(() {
-                                                _currentPage++;
-                                              });
-                                              _loadTransactions(showLoading: false);
-                                            },
-                                            child: const Text('Carregar mais'),
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                    return _buildTransactionItem(context, _transactions[index], canEdit, isMobile);
-                                  },
-                                )
-                              : SingleChildScrollView(
-                                  child: Column(
-                                    children: [
-                                      // Cabeçalho da tabela (desktop)
-                                      Card(
-                                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                                        child: Table(
-                                          columnWidths: const {
-                                            0: FlexColumnWidth(0.5),
-                                            1: FlexColumnWidth(3),
-                                            2: FlexColumnWidth(1.5),
-                                            3: FlexColumnWidth(1.5),
-                                            4: FlexColumnWidth(1.5),
-                                            5: FlexColumnWidth(1),
-                                          },
-                                          children: [
-                                            TableRow(
-                                              children: [
-                                                const Padding(
-                                                  padding: EdgeInsets.all(12),
-                                                  child: Text('', style: TextStyle(fontWeight: FontWeight.bold)),
-                                                ),
-                                                const Padding(
-                                                  padding: EdgeInsets.all(12),
-                                                  child: Text('Descrição', style: TextStyle(fontWeight: FontWeight.bold)),
-                                                ),
-                                                const Padding(
-                                                  padding: EdgeInsets.all(12),
-                                                  child: Text('Conta', style: TextStyle(fontWeight: FontWeight.bold)),
-                                                ),
-                                                const Padding(
-                                                  padding: EdgeInsets.all(12),
-                                                  child: Text('Categoria', style: TextStyle(fontWeight: FontWeight.bold)),
-                                                ),
-                                                const Padding(
-                                                  padding: EdgeInsets.all(12),
-                                                  child: Text('Data', style: TextStyle(fontWeight: FontWeight.bold)),
-                                                ),
-                                                Padding(
-                                                  padding: const EdgeInsets.all(12),
-                                                  child: Text(
-                                                    'Valor',
-                                                    style: TextStyle(fontWeight: FontWeight.bold),
-                                                    textAlign: TextAlign.right,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      // Itens da tabela
-                                      ...List.generate(
-                                        _transactions.length,
-                                        (index) => _buildTransactionItem(context, _transactions[index], canEdit, isMobile),
-                                      ),
-                                      // Botão carregar mais
-                                      if (_hasMore)
-                                        Padding(
-                                          padding: const EdgeInsets.all(16.0),
-                                          child: Center(
-                                            child: TextButton(
-                                              onPressed: () {
-                                                setState(() {
-                                                  _currentPage++;
-                                                });
-                                                _loadTransactions(showLoading: false);
-                                              },
-                                              child: const Text('Carregar mais'),
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                        ),
+                      : isMobile
+                          ? RefreshIndicator(
+                              onRefresh: () {
+                                setState(() {
+                                  _currentPage = 1;
+                                });
+                                return _loadTransactions();
+                              },
+                              child: _buildTransactionsList(canEdit, canDelete, isMobile),
+                            )
+                          : _buildTransactionsList(canEdit, canDelete, isMobile),
         ),
-      ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Constrói lista de transações agrupadas por data
+  Widget _buildTransactionsList(bool canEdit, bool canDelete, bool isMobile) {
+    final grouped = _groupTransactionsByDate(_transactions);
+    final dates = grouped.keys.toList();
+    
+    if (isMobile) {
+      return ListView.builder(
+        padding: EdgeInsets.symmetric(
+          horizontal: AppSpacing.pagePadding(context).horizontal,
+          vertical: AppSpacing.md,
+        ),
+        itemCount: dates.length + (_hasMore ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index == dates.length) {
+            return Padding(
+              padding: EdgeInsets.all(AppSpacing.lg),
+              child: Center(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _currentPage++;
+                    });
+                    _loadTransactions(showLoading: false);
+                  },
+                  icon: const Icon(Icons.expand_more),
+                  label: Text(
+                    'Carregar mais',
+                    style: AppTypography.label,
+                  ),
+                ),
+              ),
+            );
+          }
+          
+          final dateKey = dates[index];
+          final date = DateTime.parse(dateKey);
+          final transactions = grouped[dateKey]!;
+          
+          return ConstrainedBox(
+            constraints: const BoxConstraints(
+              minWidth: double.infinity,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header da data
+                Padding(
+                  padding: EdgeInsets.only(
+                    top: index > 0 ? AppSpacing.lg : 0,
+                    bottom: AppSpacing.sm,
+                  ),
+                  child: Text(
+                    _formatDateHeader(date),
+                    style: AppTypography.sectionTitle.copyWith(
+                      fontSize: 16,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+                // Transações do dia
+                ...transactions.map((transaction) => Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: _buildTransactionCard(transaction, canEdit, canDelete),
+                    )),
+              ],
+            ),
+          );
+        },
+      );
+    } else {
+      // Desktop: lista agrupada também, mas com layout diferente
+      return CustomScrollView(
+        slivers: [
+          ...dates.map((dateKey) {
+            final date = DateTime.parse(dateKey);
+            final transactions = grouped[dateKey]!;
+            return SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppSpacing.pagePadding(context).horizontal,
+                  vertical: AppSpacing.md,
+                ),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minWidth: double.infinity,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Header da data
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                        child: Text(
+                          _formatDateHeader(date),
+                          style: AppTypography.sectionTitle.copyWith(
+                            fontSize: 16,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                      // Transações do dia
+                      ...transactions.map((transaction) => Padding(
+                            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                            child: _buildTransactionCard(transaction, canEdit, canDelete),
+                          )),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+          // Botão carregar mais
+          if (_hasMore)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.all(AppSpacing.lg),
+                child: Center(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _currentPage++;
+                      });
+                      _loadTransactions(showLoading: false);
+                    },
+                    icon: const Icon(Icons.expand_more),
+                    label: Text(
+                      'Carregar mais',
+                      style: AppTypography.label,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
+    }
+  }
+
+  /// Card de transação modernizado e compacto
+  Widget _buildTransactionCard(Transaction transaction, bool canEdit, bool canDelete) {
+    final isIncome = transaction.type == 'income';
+    final currencyState = ref.watch(currencyProvider);
+    
+    return AccessibleCard(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppBorders.cardRadius),
+          onTap: () => context.go('/app/transactions/${transaction.id}'),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // Ícone circular
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: (isIncome ? AppColors.income : AppColors.expense).withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                    color: isIncome ? AppColors.income : AppColors.expense,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Conteúdo
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        transaction.description,
+                        style: AppTypography.bodyMedium.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          if (transaction.categoryName != null) ...[
+                            Text(
+                              transaction.categoryName!,
+                              style: AppTypography.caption.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '•',
+                              style: AppTypography.caption.copyWith(
+                                color: AppColors.textTertiary,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          if (transaction.accountName != null)
+                            Text(
+                              transaction.accountName!,
+                              style: AppTypography.caption.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Valor alinhado à direita
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _formatCurrency(transaction.amount, currencyState),
+                      style: AppTypography.titleMedium.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: isIncome ? AppColors.income : AppColors.expense,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _formatDate(transaction.occurredAt),
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.textTertiary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 8),
+                // Menu de ações
+                PopupMenuButton<String>(
+                  icon: Icon(Icons.more_vert, color: AppColors.textSecondary, size: 18),
+                  tooltip: 'Ações',
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  onSelected: (value) {
+                    if (value == 'edit' && canEdit) {
+                      _showEditDialog(transaction);
+                    } else if (value == 'delete' && canDelete) {
+                      _deleteTransaction(transaction);
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    if (canEdit)
+                      PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit, size: 18, color: AppColors.textSecondary),
+                            const SizedBox(width: 8),
+                            Text('Editar', style: AppTypography.bodySmall),
+                          ],
+                        ),
+                      ),
+                    if (canDelete)
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete, size: 18, color: AppColors.error),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Excluir',
+                              style: AppTypography.bodySmall.copyWith(
+                                color: AppColors.error,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
   Widget _buildTransactionItem(BuildContext context, Transaction transaction, bool canEdit, bool isMobile) {
+    // Método antigo mantido para compatibilidade, mas não usado mais
+    return _buildTransactionCard(transaction, canEdit, canEdit);
+  }
+
+  Widget _buildTransactionItemOld(BuildContext context, Transaction transaction, bool canEdit, bool isMobile) {
     if (isMobile) {
       return Card(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

@@ -11,6 +11,10 @@ import '../providers/avatar_provider.dart';
 import '../rbac/permission_helper.dart';
 import '../rbac/permissions_catalog.dart';
 import '../accessibility/telemetry_service.dart';
+import '../design/app_colors.dart';
+import '../design/app_typography.dart';
+import '../design/app_spacing.dart';
+import '../design/app_borders.dart';
 import 'menu_catalog.dart';
 
 /// Shell adaptativo que alterna entre NavigationRail/Drawer (desktop) e BottomNavigation (mobile)
@@ -110,28 +114,84 @@ class _AppShellState extends ConsumerState<AppShell> {
     required bool isWide,
   }) {
     return Scaffold(
+      backgroundColor: AppColors.scaffoldBackground,
       body: Row(
         children: [
-          NavigationRail(
-            selectedIndex: _selectedIndex >= menuItems.length ? 0 : _selectedIndex,
-            onDestinationSelected: (index) => _onItemSelected(index, context),
-            labelType: NavigationRailLabelType.all,
-            extended: false,
-            minExtendedWidth: 200,
-            destinations: menuItems.map((item) {
-              return NavigationRailDestination(
-                icon: Icon(item.icon, semanticLabel: item.label),
-                selectedIcon: Icon(
-                  item.icon,
-                  color: Theme.of(context).colorScheme.primary,
-                  semanticLabel: '${item.label} (selecionado)',
-                ),
-                label: Text(item.label),
-              );
-            }).toList(),
-            // Removido trailing para evitar overflow - avatar e logout estão no AppBar
+          // Sidebar moderna e clean
+          Container(
+            width: 80,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              border: Border(
+                right: BorderSide(color: AppColors.border, width: 1),
+              ),
+            ),
+            child: NavigationRail(
+              selectedIndex: _selectedIndex >= menuItems.length ? 0 : _selectedIndex,
+              onDestinationSelected: (index) => _onItemSelected(index, context),
+              labelType: NavigationRailLabelType.none, // Apenas ícones
+              extended: false,
+              backgroundColor: Colors.transparent,
+              elevation: null,
+              selectedIconTheme: IconThemeData(
+                color: AppColors.primary,
+                size: 24,
+              ),
+              unselectedIconTheme: IconThemeData(
+                color: AppColors.textSecondary,
+                size: 24,
+              ),
+              selectedLabelTextStyle: AppTypography.label.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w600,
+              ),
+              unselectedLabelTextStyle: AppTypography.label.copyWith(
+                color: AppColors.textSecondary,
+              ),
+              destinations: menuItems.map((item) {
+                final isSelected = menuItems.indexOf(item) == _selectedIndex;
+                return NavigationRailDestination(
+                  icon: Container(
+                    padding: const EdgeInsets.all(AppSpacing.sm),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppColors.primary.withOpacity(0.1)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(AppBorders.smallRadius),
+                    ),
+                    child: Icon(
+                      item.icon,
+                      semanticLabel: item.label,
+                      size: 22,
+                    ),
+                  ),
+                  selectedIcon: Container(
+                    padding: const EdgeInsets.all(AppSpacing.sm),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(AppBorders.smallRadius),
+                    ),
+                    child: Icon(
+                      item.icon,
+                      color: AppColors.primary,
+                      semanticLabel: '${item.label} (selecionado)',
+                      size: 22,
+                    ),
+                  ),
+                  label: Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.xs),
+                    child: Text(
+                      item.label,
+                      style: AppTypography.caption,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
           ),
-          const VerticalDivider(thickness: 1, width: 1),
           Expanded(
             child: Column(
               children: [
@@ -165,11 +225,21 @@ class _AppShellState extends ConsumerState<AppShell> {
       drawer: otherItems.isEmpty
           ? null
           : Drawer(
+              backgroundColor: AppColors.surface,
               child: ListView(
                 children: [
-                  DrawerHeader(
+                  // Header do drawer moderno
+                  Container(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primaryContainer,
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          AppColors.primary.withOpacity(0.1),
+                          AppColors.secondary.withOpacity(0.1),
+                        ],
+                      ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -178,7 +248,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                         Consumer(
                           builder: (context, ref, child) {
                             return Padding(
-                              padding: const EdgeInsets.only(bottom: 12.0),
+                              padding: const EdgeInsets.only(bottom: AppSpacing.md),
                               child: UserAvatar(
                                 radius: 32,
                                 onTap: () {
@@ -191,36 +261,75 @@ class _AppShellState extends ConsumerState<AppShell> {
                         ),
                         Text(
                           authState.organizationName ?? 'Symplus',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
+                          style: AppTypography.sectionTitle.copyWith(
+                            fontSize: 18,
+                          ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: AppSpacing.xs),
                         Text(
                           authState.userName ?? 'Usuário',
-                          style: Theme.of(context).textTheme.bodyMedium,
+                          style: AppTypography.bodyMedium.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
                         ),
-                        const SizedBox(height: 4),
-                        Chip(
-                          label: Text(authState.role.name.toUpperCase()),
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        const SizedBox(height: AppSpacing.sm),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                            vertical: AppSpacing.xs,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(AppBorders.chipRadius),
+                          ),
+                          child: Text(
+                            _getRoleLabel(authState.role),
+                            style: AppTypography.label.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  ...otherItems.map((item) => ListTile(
-                        leading: Icon(item.icon),
-                        title: Text(item.label),
-                        selected: item.route == widget.currentRoute,
-                        onTap: () {
-                          Navigator.of(context).pop();
-                          context.go(item.route);
-                        },
-                      )),
-                  const Divider(),
+                  const Divider(height: 1),
+                  // Itens do menu
+                  ...otherItems.map((item) {
+                    final isSelected = item.route == widget.currentRoute;
+                    return ListTile(
+                      leading: Icon(
+                        item.icon,
+                        color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                      ),
+                      title: Text(
+                        item.label,
+                        style: AppTypography.bodyMedium.copyWith(
+                          color: isSelected ? AppColors.primary : AppColors.onSurface,
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                      ),
+                      selected: isSelected,
+                      selectedTileColor: AppColors.primary.withOpacity(0.1),
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        context.go(item.route);
+                      },
+                    );
+                  }),
+                  const Divider(height: 1),
+                  // Logout
                   ListTile(
-                    leading: const Icon(Icons.logout),
-                    title: const Text('Sair'),
+                    leading: const Icon(
+                      Icons.logout,
+                      color: AppColors.error,
+                    ),
+                    title: Text(
+                      'Sair',
+                      style: AppTypography.bodyMedium.copyWith(
+                        color: AppColors.error,
+                      ),
+                    ),
                     onTap: () {
                       Navigator.of(context).pop();
                       _handleLogout(context);
@@ -233,31 +342,61 @@ class _AppShellState extends ConsumerState<AppShell> {
         bottom: false, // BottomNavigationBar já tem sua própria área segura
         child: widget.child,
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        currentIndex: bottomNavIndex >= 0 ? bottomNavIndex : 0,
-        onTap: (index) {
-          if (index < bottomNavItems.length) {
-            _onItemSelected(menuItems.indexOf(bottomNavItems[index]), context);
-          }
-        },
-        items: bottomNavItems.map((item) {
-          return BottomNavigationBarItem(
-            icon: Icon(item.icon, semanticLabel: item.label),
-            activeIcon: Icon(
-              item.icon,
-              semanticLabel: '${item.label} (selecionado)',
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          border: Border(
+            top: BorderSide(color: AppColors.border, width: 1),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.border.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, -2),
             ),
-            label: item.label,
-          );
-        }).toList(),
+          ],
+        ),
+        child: BottomNavigationBar(
+          type: BottomNavigationBarType.fixed,
+          currentIndex: bottomNavIndex >= 0 ? bottomNavIndex : 0,
+          onTap: (index) {
+            if (index < bottomNavItems.length) {
+              _onItemSelected(menuItems.indexOf(bottomNavItems[index]), context);
+            }
+          },
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          selectedItemColor: AppColors.primary,
+          unselectedItemColor: AppColors.textSecondary,
+          selectedLabelStyle: AppTypography.label.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+          unselectedLabelStyle: AppTypography.label,
+          items: bottomNavItems.map((item) {
+            final isSelected = bottomNavItems.indexOf(item) == bottomNavIndex;
+            return BottomNavigationBarItem(
+              icon: Icon(
+                item.icon,
+                semanticLabel: item.label,
+                size: 24,
+              ),
+              activeIcon: Icon(
+                item.icon,
+                color: AppColors.primary,
+                semanticLabel: '${item.label} (selecionado)',
+                size: 24,
+              ),
+              label: item.label,
+            );
+          }).toList(),
+        ),
       ),
       floatingActionButton: _buildFAB(context, authState),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }
 
-  /// AppBar contextual com Quick Switch
+  /// AppBar moderno: Breadcrumb + Título | Ações à direita
   PreferredSizeWidget _buildAppBar(
     BuildContext context,
     AuthState authState,
@@ -266,20 +405,55 @@ class _AppShellState extends ConsumerState<AppShell> {
     required bool isWide,
   }) {
     return AppBar(
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
+      backgroundColor: AppColors.surface,
+      elevation: 0,
+      automaticallyImplyLeading: false,
+      title: Row(
         children: [
-          Text(currentItem?.label ?? 'Symplus Finance'),
-          if (!isWide && authState.organizationName != null)
+          // Breadcrumb (se houver contexto)
+          if (isWide && currentItem != null) ...[
             Text(
-              authState.organizationName!,
-              style: Theme.of(context).textTheme.bodySmall,
+              'Symplus',
+              style: AppTypography.caption.copyWith(
+                color: AppColors.textTertiary,
+              ),
             ),
+            const SizedBox(width: AppSpacing.xs),
+            Icon(
+              Icons.chevron_right,
+              size: 14,
+              color: AppColors.textTertiary,
+            ),
+            const SizedBox(width: AppSpacing.xs),
+          ],
+          // Título
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  currentItem?.label ?? 'Symplus Finance',
+                  style: AppTypography.display.copyWith(
+                    fontSize: isWide ? 24 : 20,
+                  ),
+                ),
+                if (isWide && authState.organizationName != null) ...[
+                  const SizedBox(height: AppSpacing.xs / 2),
+                  Text(
+                    authState.organizationName!,
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ],
       ),
       actions: [
-        // Seletor rápido de seções (sempre disponível)
+        // Seletor rápido de seções
         _buildQuickSwitch(context, menuItems, currentItem),
         
         // Dev Tools (apenas em debug mode)
@@ -289,9 +463,9 @@ class _AppShellState extends ConsumerState<AppShell> {
         Consumer(
           builder: (context, ref, child) {
             return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
               child: UserAvatar(
-                radius: 20,
+                radius: isWide ? 24 : 20,
                 onTap: () => context.go('/app/profile'),
               ),
             );
@@ -299,14 +473,41 @@ class _AppShellState extends ConsumerState<AppShell> {
         ),
         
         // Info da organização (desktop)
-        if (isWide)
+        if (isWide && authState.organizationName != null)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            padding: const EdgeInsets.only(right: AppSpacing.sm),
             child: Tooltip(
               message: 'Organização atual',
-              child: Chip(
-                avatar: const Icon(Icons.business, size: 18),
-                label: Text(authState.organizationName ?? 'Org'),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.xs,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(AppBorders.chipRadius),
+                  border: Border.all(
+                    color: AppColors.primary.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.business,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Text(
+                      authState.organizationName!,
+                      style: AppTypography.label.copyWith(
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -314,20 +515,42 @@ class _AppShellState extends ConsumerState<AppShell> {
         // Papel (desktop)
         if (isWide)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            padding: const EdgeInsets.only(right: AppSpacing.sm),
             child: Tooltip(
               message: 'Papel do usuário',
-              child: Chip(
-                label: Text(_getRoleLabel(authState.role)),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.xs,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.secondaryLight.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(AppBorders.chipRadius),
+                  border: Border.all(
+                    color: AppColors.secondary.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Text(
+                  _getRoleLabel(authState.role),
+                  style: AppTypography.label.copyWith(
+                    color: AppColors.secondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ),
           ),
         
         // Botão de logout
-        IconButton(
-          icon: const Icon(Icons.logout),
-          onPressed: () => _handleLogout(context),
-          tooltip: 'Sair',
+        Padding(
+          padding: const EdgeInsets.only(right: AppSpacing.md),
+          child: IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () => _handleLogout(context),
+            tooltip: 'Sair',
+            color: AppColors.textSecondary,
+          ),
         ),
       ],
     );
@@ -483,7 +706,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     }
   }
 
-  /// FAB central com action sheet
+  /// FAB central moderno com action sheet
   Widget? _buildFAB(BuildContext context, AuthState authState) {
     // Verificar se há pelo menos uma ação permitida
     final canCreateTransaction = PermissionHelper.hasPermission(authState, Permission.transactionsCreate);
@@ -497,10 +720,33 @@ class _AppShellState extends ConsumerState<AppShell> {
       return null;
     }
 
-    return FloatingActionButton(
-      onPressed: () => _showAddActionSheet(context, authState),
-      tooltip: 'Adicionar',
-      child: const Icon(Icons.add),
+    return Container(
+      width: 64,
+      height: 64,
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+            spreadRadius: 0,
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _showAddActionSheet(context, authState),
+          borderRadius: BorderRadius.circular(32),
+          child: const Icon(
+            Icons.add,
+            color: AppColors.onBackground,
+            size: 28,
+          ),
+        ),
+      ),
     );
   }
 
@@ -516,26 +762,38 @@ class _AppShellState extends ConsumerState<AppShell> {
 
     showModalBottomSheet(
       context: context,
+      backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppBorders.cardRadius)),
       ),
       builder: (context) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                'Adicionar',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+            // Handle
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.border,
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+              child: Text(
+                'Adicionar',
+                style: AppTypography.sectionTitle,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
             if (canCreateTransaction)
-              ListTile(
-                leading: const Icon(Icons.swap_horiz, color: Colors.green),
-                title: const Text('Transação'),
+              _buildActionSheetItem(
+                context,
+                icon: Icons.swap_horiz,
+                label: 'Transação',
+                color: AppColors.income,
                 onTap: () {
                   Navigator.pop(context);
                   TelemetryService.logAction('ui_add_transaction_clicked', metadata: {'source': 'fab'});
@@ -543,9 +801,11 @@ class _AppShellState extends ConsumerState<AppShell> {
                 },
               ),
             if (canCreateAccount)
-              ListTile(
-                leading: const Icon(Icons.account_balance_wallet, color: Colors.indigo),
-                title: const Text('Conta'),
+              _buildActionSheetItem(
+                context,
+                icon: Icons.account_balance_wallet,
+                label: 'Conta',
+                color: AppColors.secondary,
                 onTap: () {
                   Navigator.pop(context);
                   TelemetryService.logAction('ui_add_account_clicked', metadata: {'source': 'fab'});
@@ -553,9 +813,11 @@ class _AppShellState extends ConsumerState<AppShell> {
                 },
               ),
             if (canCreateCategory)
-              ListTile(
-                leading: const Icon(Icons.category, color: Colors.purple),
-                title: const Text('Categoria'),
+              _buildActionSheetItem(
+                context,
+                icon: Icons.category,
+                label: 'Categoria',
+                color: AppColors.secondary,
                 onTap: () {
                   Navigator.pop(context);
                   TelemetryService.logAction('ui_add_category_clicked', metadata: {'source': 'fab'});
@@ -563,9 +825,11 @@ class _AppShellState extends ConsumerState<AppShell> {
                 },
               ),
             if (canUploadDocument)
-              ListTile(
-                leading: const Icon(Icons.folder, color: Colors.blue),
-                title: const Text('Documento'),
+              _buildActionSheetItem(
+                context,
+                icon: Icons.folder,
+                label: 'Documento',
+                color: AppColors.info,
                 onTap: () {
                   Navigator.pop(context);
                   TelemetryService.logAction('ui_add_document_clicked', metadata: {'source': 'fab'});
@@ -573,17 +837,68 @@ class _AppShellState extends ConsumerState<AppShell> {
                 },
               ),
             if (canCreateRequest)
-              ListTile(
-                leading: const Icon(Icons.support_agent, color: Colors.orange),
-                title: const Text('Solicitação'),
+              _buildActionSheetItem(
+                context,
+                icon: Icons.support_agent,
+                label: 'Solicitação',
+                color: AppColors.warning,
                 onTap: () {
                   Navigator.pop(context);
                   TelemetryService.logAction('ui_add_request_clicked', metadata: {'source': 'fab'});
                   context.go('/app/requests?action=create');
                 },
               ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.lg),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// Item do action sheet moderno
+  Widget _buildActionSheetItem(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.sm),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(AppBorders.smallRadius),
+                ),
+                child: Icon(
+                  icon,
+                  color: color,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Text(
+                label,
+                style: AppTypography.bodyLarge,
+              ),
+              const Spacer(),
+              Icon(
+                Icons.chevron_right,
+                color: AppColors.textTertiary,
+                size: 20,
+              ),
+            ],
+          ),
         ),
       ),
     );

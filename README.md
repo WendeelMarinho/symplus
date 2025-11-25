@@ -5,6 +5,9 @@ Plataforma completa de gestão financeira multi-tenant com dashboard personaliz�
 [![Flutter](https://img.shields.io/badge/Flutter-3.0+-02569B?logo=flutter)](https://flutter.dev)
 [![Laravel](https://img.shields.io/badge/Laravel-11-FF2D20?logo=laravel)](https://laravel.com)
 [![License](https://img.shields.io/badge/License-Proprietary-red)](LICENSE)
+[![Status](https://img.shields.io/badge/Status-Production-green)](https://srv1113923.hstgr.cloud)
+
+> **⚠️ Projeto Privado**: Este repositório é privado e não aceita contribuições externas. Todos os direitos reservados.
 
 ---
 
@@ -19,7 +22,6 @@ Plataforma completa de gestão financeira multi-tenant com dashboard personaliz�
 - [Build de Aplicativos](#-build-de-aplicativos)
 - [Estrutura do Projeto](#-estrutura-do-projeto)
 - [Documentação](#-documentação)
-- [Contribuindo](#-contribuindo)
 - [Licença](#-licença)
 
 ---
@@ -170,17 +172,18 @@ Para mais detalhes, consulte:
 
 ## 🌐 Deploy para Produção
 
-### Informações da VPS
+### ⚠️ Informações Confidenciais
+
+**Nota**: As informações abaixo são confidenciais e devem ser mantidas em segurança.
 
 - **Host**: `srv1113923.hstgr.cloud`
-- **IP**: `72.61.6.135`
 - **SO**: Ubuntu 22.04 LTS
-- **Usuário SSH**: `root`
 - **Path de Deploy**: `/var/www/symplus`
+- **URL de Produção**: `https://srv1113923.hstgr.cloud`
 
 ### Deploy Automatizado
 
-O projeto inclui scripts automatizados para deploy zero-downtime:
+O projeto inclui scripts automatizados para deploy zero-downtime com sistema de releases:
 
 ```bash
 # Configurar variáveis de ambiente
@@ -191,9 +194,16 @@ export GIT_REPO="https://github.com/WendeelMarinho/symplus.git"
 export BRANCH="main"
 export DOMAIN_HEALTHCHECK="https://srv1113923.hstgr.cloud/api/health"
 
-# Executar deploy
+# Executar deploy (zero-downtime)
 bash scripts/vps_deploy.sh
 ```
+
+**Características do Deploy**:
+- ✅ Zero-downtime com sistema de releases
+- ✅ Healthcheck automático antes de ativar nova release
+- ✅ Rollback automático em caso de falha
+- ✅ Limpeza automática de releases antigas (mantém últimas 5)
+- ✅ Backup automático de configurações
 
 ### Deploy Manual
 
@@ -214,6 +224,15 @@ cp -r build/web/* ../backend/public/app/
 
 #### 2. Deploy no Servidor
 
+**Opção A: Deploy Automatizado (Recomendado)**
+
+```bash
+# Usar script de deploy automatizado
+bash scripts/vps_deploy.sh
+```
+
+**Opção B: Deploy Manual**
+
 ```bash
 # Conectar ao servidor
 ssh root@srv1113923.hstgr.cloud
@@ -226,21 +245,27 @@ git pull origin main
 cd backend
 docker compose -f docker-compose.prod.yml exec php php artisan migrate --force
 
-# Copiar build do Flutter (se não foi feito localmente)
+# Build do Flutter (se não foi feito localmente)
 cd ../app
 flutter build web --release \
   --dart-define=API_BASE_URL=https://srv1113923.hstgr.cloud \
-  --base-href=/app/
+  --base-href=/app/ \
+  --web-renderer canvaskit
+
+# Copiar build para diretório público
 mkdir -p ../backend/public/app
 rm -rf ../backend/public/app/*
 cp -r build/web/* ../backend/public/app/
 
-# Reiniciar serviços
+# Otimizar cache do Laravel
 cd ../backend
+docker compose -f docker-compose.prod.yml exec php php artisan optimize
+
+# Reiniciar serviços
 docker compose -f docker-compose.prod.yml restart nginx
 ```
 
-### Verificação
+### Verificação Pós-Deploy
 
 ```bash
 # Healthcheck da API
@@ -248,6 +273,19 @@ curl https://srv1113923.hstgr.cloud/api/health
 
 # Verificar app web
 curl -I https://srv1113923.hstgr.cloud/app/
+
+# Verificar logs (se necessário)
+ssh root@srv1113923.hstgr.cloud
+cd /var/www/symplus/backend
+docker compose -f docker-compose.prod.yml logs --tail=50
+```
+
+### Rollback
+
+Em caso de problemas, é possível fazer rollback para a release anterior:
+
+```bash
+bash scripts/vps_rollback.sh
 ```
 
 **Documentação completa**: [DEPLOY.md](./DEPLOY.md)
@@ -331,22 +369,11 @@ symplus/
 ### Documentação Principal
 
 - **[DEPLOY.md](./DEPLOY.md)** - Guia completo de deploy para produção
-- **[DASHBOARD_OVERVIEW.md](./DASHBOARD_OVERVIEW.md)** - Overview completo do sistema de dashboard
-- **[DASHBOARD_SUMMARY.md](./DASHBOARD_SUMMARY.md)** - Resumo executivo do dashboard
-- **[PROMPT_IA.md](./PROMPT_IA.md)** - Prompt para IA fazer deploy
 
 ### Documentação por Módulo
 
 - **Backend**: [backend/README.md](./backend/README.md)
 - **Frontend**: [app/README.md](./app/README.md)
-- **Scripts**: [scripts/README.md](./scripts/README.md)
-
-### Documentação Técnica
-
-- [docs/QUICK_START.md](./docs/QUICK_START.md) - Setup rápido
-- [docs/DEPLOY_VPS.md](./docs/DEPLOY_VPS.md) - Deploy na VPS
-- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) - Arquitetura do sistema
-- [docs/API.md](./docs/API.md) - Documentação da API
 
 ---
 
@@ -373,15 +400,18 @@ symplus/
 14. ✅ Persistência de Sessão
 15. ✅ RBAC Completo
 
-### Correções Aplicadas
+### Correções Aplicadas (v2.0.0)
 
 - ✅ Erros de compilação corrigidos
 - ✅ Erros de layout e renderização corrigidos
-- ✅ Overflow de layout resolvido
+- ✅ Overflow de layout resolvido (Dashboard e Reports)
 - ✅ Constraints não limitadas corrigidas
+- ✅ TextFormField/DropdownButtonFormField com largura definida
+- ✅ TopCategoriesDonutChart com altura controlada
 - ✅ Verificações `mounted` adicionadas
 - ✅ Build de produção configurado
 - ✅ Scripts de deploy prontos
+- ✅ Layout seguro para Flutter Web
 
 ### Compatibilidade
 
@@ -421,30 +451,13 @@ symplus/
 
 ---
 
-## 🤝 Contribuindo
-
-1. Fork o projeto
-2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
-3. Commit suas mudanças (`git commit -m 'feat: Add some AmazingFeature'`)
-4. Push para a branch (`git push origin feature/AmazingFeature`)
-5. Abra um Pull Request
-
-**Guia de Contribuição**: [CONTRIBUTING.md](./CONTRIBUTING.md)
-
----
-
 ## 📝 Licença
 
-Este projeto é proprietário. Todos os direitos reservados.
+Este projeto é **privado e proprietário**. Todos os direitos reservados.
+
+**⚠️ Aviso**: Este repositório é privado e não aceita contribuições externas.
 
 Ver [LICENSE](./LICENSE) para mais detalhes.
-
----
-
-## 📞 Contato
-
-- **Repositório**: https://github.com/WendeelMarinho/symplus
-- **Issues**: https://github.com/WendeelMarinho/symplus/issues
 
 ---
 
@@ -459,6 +472,22 @@ Ver [LICENSE](./LICENSE) para mais detalhes.
 - [ ] Dashboard analytics avançado
 - [ ] Notificações push
 - [ ] Modo offline
+- [ ] Relatórios avançados com filtros customizados
+- [ ] Integração com APIs de cotação de moedas
+- [ ] Sistema de backup automático
+
+---
+
+## 🔒 Segurança
+
+Este é um projeto **privado**. Não compartilhe credenciais, tokens ou informações sensíveis.
+
+### Informações Sensíveis
+
+- Arquivos `.env` não devem ser commitados
+- Credenciais de banco de dados devem estar apenas no servidor
+- Tokens de API devem ser configurados via variáveis de ambiente
+- Chaves de assinatura (Android/iOS) devem ser mantidas em local seguro
 
 ---
 

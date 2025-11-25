@@ -67,18 +67,25 @@ class _DraggableDashboardItemState extends State<DraggableDashboardItem> {
         opacity: 0.3,
         child: widget.child,
       ),
-      child: Stack(
-        children: [
-          widget.child,
-          // Drag handle no canto superior direito
-          Positioned(
-            top: 8,
-            right: 8,
-            child: _DragHandle(
-              isDragging: _isDragging,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          minHeight: 100, // Altura mínima para evitar widgets sem tamanho
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            // Widget filho - deixa ele determinar seu próprio tamanho
+            widget.child,
+            // Drag handle no canto superior direito
+            Positioned(
+              top: 8,
+              right: 8,
+              child: _DragHandle(
+                isDragging: _isDragging,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

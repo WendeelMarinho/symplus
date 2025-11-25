@@ -13,6 +13,9 @@ import '../../../../core/widgets/confirm_dialog.dart';
 import '../../../../core/auth/auth_provider.dart';
 import '../../../../core/rbac/permission_helper.dart';
 import '../../../../core/rbac/permissions_catalog.dart';
+import '../../../../core/design/app_colors.dart';
+import '../../../../core/design/app_typography.dart';
+import '../../../../core/design/app_borders.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/services/category_service.dart';
 import '../../data/models/category.dart';
@@ -120,180 +123,351 @@ class _CategoriesPageState extends ConsumerState<CategoriesPage> {
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Nova Categoria'),
-          content: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Preview de cor/ícone
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: _parseColor(colorController.text).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: _parseColor(colorController.text),
-                        width: 2,
+        builder: (context, setDialogState) => Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: 500,
+              maxHeight: 700,
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Header
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: AppColors.secondary.withOpacity(0.1),
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(20),
+                          topRight: Radius.circular(20),
+                        ),
                       ),
-                    ),
-                    child: Column(
-                      children: [
-                        Container(
-                          width: 64,
-                          height: 64,
-                          decoration: BoxDecoration(
-                            color: _parseColor(colorController.text).withOpacity(0.2),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: _parseColor(colorController.text),
-                              width: 2,
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.secondary,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.category,
+                              color: Colors.white,
+                              size: 24,
                             ),
                           ),
-                          child: Icon(
-                            Icons.category,
-                            color: _parseColor(colorController.text),
-                            size: 36,
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Nova Categoria',
+                                  style: AppTypography.headlineSmall.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.onSurface,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Crie uma categoria personalizada',
+                                  style: AppTypography.bodyMedium.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          nameController.text.isEmpty ? 'Preview' : nameController.text,
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Nome da Categoria *',
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (value) =>
-                        value?.isEmpty ?? true ? 'Nome é obrigatório' : null,
-                    autofocus: true,
-                    onChanged: (_) => setDialogState(() {}),
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    value: typeController.text,
-                    decoration: const InputDecoration(
-                      labelText: 'Tipo *',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 'income', child: Text('Receita')),
-                      DropdownMenuItem(value: 'expense', child: Text('Despesa')),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        typeController.text = value;
-                        setDialogState(() {});
-                      }
-                    },
-                    validator: (value) =>
-                        value?.isEmpty ?? true ? 'Tipo é obrigatório' : null,
-                  ),
-                  const SizedBox(height: 16),
-                  // Seletor de cores
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Cor',
-                        style: Theme.of(context).textTheme.labelMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: presetColors.map((color) {
-                          final isSelected = colorController.text == color;
-                          return GestureDetector(
-                            onTap: () {
-                              colorController.text = color;
-                              setDialogState(() {});
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                              Future.microtask(() {
+                                nameController.dispose();
+                                typeController.dispose();
+                                colorController.dispose();
+                              });
                             },
-                            child: Container(
-                              width: 40,
-                              height: 40,
+                            color: AppColors.textSecondary,
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Conteúdo com scroll
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Preview de cor/ícone
+                            Container(
+                              padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                color: _parseColor(color),
-                                shape: BoxShape.circle,
+                                color: _parseColor(colorController.text).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: isSelected
-                                      ? Theme.of(context).colorScheme.primary
-                                      : Colors.transparent,
-                                  width: isSelected ? 3 : 0,
+                                  color: _parseColor(colorController.text),
+                                  width: 2,
                                 ),
                               ),
-                              child: isSelected
-                                  ? const Icon(Icons.check, color: Colors.white, size: 20)
-                                  : null,
+                              child: Column(
+                                children: [
+                                  Container(
+                                    width: 64,
+                                    height: 64,
+                                    decoration: BoxDecoration(
+                                      color: _parseColor(colorController.text).withOpacity(0.2),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: _parseColor(colorController.text),
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: Icon(
+                                      Icons.category,
+                                      color: _parseColor(colorController.text),
+                                      size: 36,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    nameController.text.isEmpty ? 'Preview' : nameController.text,
+                                    style: AppTypography.titleMedium.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        controller: colorController,
-                        decoration: const InputDecoration(
-                          labelText: 'Cor (hex)',
-                          border: OutlineInputBorder(),
-                          helperText: 'Ex: #3B82F6',
+                            const SizedBox(height: 20),
+                            TextFormField(
+                              controller: nameController,
+                              decoration: InputDecoration(
+                                labelText: 'Nome da Categoria *',
+                                filled: true,
+                                fillColor: AppColors.background,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.border),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.border),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.primary, width: 2),
+                                ),
+                                prefixIcon: Icon(Icons.label, color: AppColors.primary),
+                              ),
+                              style: AppTypography.bodyMedium,
+                              validator: (value) =>
+                                  value?.isEmpty ?? true ? 'Nome é obrigatório' : null,
+                              autofocus: true,
+                              onChanged: (_) => setDialogState(() {}),
+                            ),
+                            const SizedBox(height: 20),
+                            DropdownButtonFormField<String>(
+                              value: typeController.text,
+                              decoration: InputDecoration(
+                                labelText: 'Tipo *',
+                                filled: true,
+                                fillColor: AppColors.background,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.border),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.border),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.primary, width: 2),
+                                ),
+                                prefixIcon: Icon(Icons.swap_horiz, color: AppColors.primary),
+                              ),
+                              style: AppTypography.bodyMedium,
+                              items: const [
+                                DropdownMenuItem(value: 'income', child: Text('Receita')),
+                                DropdownMenuItem(value: 'expense', child: Text('Despesa')),
+                              ],
+                              onChanged: (value) {
+                                if (value != null) {
+                                  typeController.text = value;
+                                  setDialogState(() {});
+                                }
+                              },
+                              validator: (value) =>
+                                  value?.isEmpty ?? true ? 'Tipo é obrigatório' : null,
+                            ),
+                            const SizedBox(height: 20),
+                            // Seletor de cores
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Cor',
+                                  style: AppTypography.labelMedium.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Wrap(
+                                  spacing: 12,
+                                  runSpacing: 12,
+                                  children: presetColors.map((color) {
+                                    final isSelected = colorController.text == color;
+                                    return GestureDetector(
+                                      onTap: () {
+                                        colorController.text = color;
+                                        setDialogState(() {});
+                                      },
+                                      child: Container(
+                                        width: 44,
+                                        height: 44,
+                                        decoration: BoxDecoration(
+                                          color: _parseColor(color),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: isSelected
+                                                ? AppColors.primary
+                                                : Colors.transparent,
+                                            width: isSelected ? 3 : 0,
+                                          ),
+                                          boxShadow: isSelected
+                                              ? [
+                                                  BoxShadow(
+                                                    color: _parseColor(color).withOpacity(0.3),
+                                                    blurRadius: 8,
+                                                    spreadRadius: 2,
+                                                  ),
+                                                ]
+                                              : null,
+                                        ),
+                                        child: isSelected
+                                            ? const Icon(Icons.check, color: Colors.white, size: 24)
+                                            : null,
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                                const SizedBox(height: 12),
+                                TextFormField(
+                                  controller: colorController,
+                                  decoration: InputDecoration(
+                                    labelText: 'Cor (hex)',
+                                    filled: true,
+                                    fillColor: AppColors.background,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: AppColors.border),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: AppColors.border),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: AppColors.primary, width: 2),
+                                    ),
+                                    prefixIcon: Icon(Icons.palette, color: AppColors.primary),
+                                    helperText: 'Ex: #3B82F6',
+                                    helperStyle: AppTypography.caption,
+                                  ),
+                                  style: AppTypography.bodyMedium,
+                                  onChanged: (_) => setDialogState(() {}),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                        onChanged: (_) => setDialogState(() {}),
                       ),
-                    ],
-                  ),
-                ],
+                    ),
+                    // Botões
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          top: BorderSide(color: AppColors.border, width: 1),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                              Future.microtask(() {
+                                nameController.dispose();
+                                typeController.dispose();
+                                colorController.dispose();
+                              });
+                            },
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            ),
+                            child: Text(
+                              'Cancelar',
+                              style: AppTypography.labelLarge.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          FilledButton(
+                            onPressed: () async {
+                              if (formKey.currentState!.validate()) {
+                                final name = nameController.text;
+                                final type = typeController.text;
+                                final color = colorController.text.isNotEmpty ? colorController.text : null;
+                                
+                                Navigator.of(context).pop();
+                                Future.microtask(() {
+                                  nameController.dispose();
+                                  typeController.dispose();
+                                  colorController.dispose();
+                                });
+                                await _createCategory(name, type, color);
+                              }
+                            },
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.secondary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Text(
+                              'Criar',
+                              style: AppTypography.labelLarge.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              // Dispose controllers após fechar o diálogo
-              Future.microtask(() {
-                nameController.dispose();
-                typeController.dispose();
-                colorController.dispose();
-              });
-            },
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              if (formKey.currentState!.validate()) {
-                // Salvar valores antes de fechar
-                final name = nameController.text;
-                final type = typeController.text;
-                final color = colorController.text.isNotEmpty ? colorController.text : null;
-                
-                // Fechar diálogo primeiro
-                Navigator.of(context).pop();
-                // Dispose controllers após fechar
-                Future.microtask(() {
-                  nameController.dispose();
-                  typeController.dispose();
-                  colorController.dispose();
-                });
-                // Criar categoria com valores salvos
-                await _createCategory(name, type, color);
-              }
-            },
-            child: const Text('Criar'),
-          ),
-        ],
-      ),
         ),
+      ),
     );
   }
 
@@ -344,180 +518,351 @@ class _CategoriesPageState extends ConsumerState<CategoriesPage> {
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Editar Categoria'),
-          content: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Preview de cor/ícone
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: _parseColor(colorController.text).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: _parseColor(colorController.text),
-                        width: 2,
+        builder: (context, setDialogState) => Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: 500,
+              maxHeight: 700,
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Header
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: AppColors.secondary.withOpacity(0.1),
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(20),
+                          topRight: Radius.circular(20),
+                        ),
                       ),
-                    ),
-                    child: Column(
-                      children: [
-                        Container(
-                          width: 64,
-                          height: 64,
-                          decoration: BoxDecoration(
-                            color: _parseColor(colorController.text).withOpacity(0.2),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: _parseColor(colorController.text),
-                              width: 2,
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.secondary,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.edit,
+                              color: Colors.white,
+                              size: 24,
                             ),
                           ),
-                          child: Icon(
-                            Icons.category,
-                            color: _parseColor(colorController.text),
-                            size: 36,
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Editar Categoria',
+                                  style: AppTypography.headlineSmall.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.onSurface,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Atualize os dados da categoria',
+                                  style: AppTypography.bodyMedium.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          nameController.text,
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Nome da Categoria *',
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (value) =>
-                        value?.isEmpty ?? true ? 'Nome é obrigatório' : null,
-                    autofocus: true,
-                    onChanged: (_) => setDialogState(() {}),
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    value: typeController.text,
-                    decoration: const InputDecoration(
-                      labelText: 'Tipo *',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 'income', child: Text('Receita')),
-                      DropdownMenuItem(value: 'expense', child: Text('Despesa')),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        typeController.text = value;
-                        setDialogState(() {});
-                      }
-                    },
-                    validator: (value) =>
-                        value?.isEmpty ?? true ? 'Tipo é obrigatório' : null,
-                  ),
-                  const SizedBox(height: 16),
-                  // Seletor de cores
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Cor',
-                        style: Theme.of(context).textTheme.labelMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: presetColors.map((color) {
-                          final isSelected = colorController.text == color;
-                          return GestureDetector(
-                            onTap: () {
-                              colorController.text = color;
-                              setDialogState(() {});
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                              Future.microtask(() {
+                                nameController.dispose();
+                                typeController.dispose();
+                                colorController.dispose();
+                              });
                             },
-                            child: Container(
-                              width: 40,
-                              height: 40,
+                            color: AppColors.textSecondary,
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Conteúdo com scroll
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Preview de cor/ícone
+                            Container(
+                              padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                color: _parseColor(color),
-                                shape: BoxShape.circle,
+                                color: _parseColor(colorController.text).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: isSelected
-                                      ? Theme.of(context).colorScheme.primary
-                                      : Colors.transparent,
-                                  width: isSelected ? 3 : 0,
+                                  color: _parseColor(colorController.text),
+                                  width: 2,
                                 ),
                               ),
-                              child: isSelected
-                                  ? const Icon(Icons.check, color: Colors.white, size: 20)
-                                  : null,
+                              child: Column(
+                                children: [
+                                  Container(
+                                    width: 64,
+                                    height: 64,
+                                    decoration: BoxDecoration(
+                                      color: _parseColor(colorController.text).withOpacity(0.2),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: _parseColor(colorController.text),
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: Icon(
+                                      Icons.category,
+                                      color: _parseColor(colorController.text),
+                                      size: 36,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    nameController.text,
+                                    style: AppTypography.titleMedium.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        controller: colorController,
-                        decoration: const InputDecoration(
-                          labelText: 'Cor (hex)',
-                          border: OutlineInputBorder(),
-                          helperText: 'Ex: #3B82F6',
+                            const SizedBox(height: 20),
+                            TextFormField(
+                              controller: nameController,
+                              decoration: InputDecoration(
+                                labelText: 'Nome da Categoria *',
+                                filled: true,
+                                fillColor: AppColors.background,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.border),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.border),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.primary, width: 2),
+                                ),
+                                prefixIcon: Icon(Icons.label, color: AppColors.primary),
+                              ),
+                              style: AppTypography.bodyMedium,
+                              validator: (value) =>
+                                  value?.isEmpty ?? true ? 'Nome é obrigatório' : null,
+                              autofocus: true,
+                              onChanged: (_) => setDialogState(() {}),
+                            ),
+                            const SizedBox(height: 20),
+                            DropdownButtonFormField<String>(
+                              value: typeController.text,
+                              decoration: InputDecoration(
+                                labelText: 'Tipo *',
+                                filled: true,
+                                fillColor: AppColors.background,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.border),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.border),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.primary, width: 2),
+                                ),
+                                prefixIcon: Icon(Icons.swap_horiz, color: AppColors.primary),
+                              ),
+                              style: AppTypography.bodyMedium,
+                              items: const [
+                                DropdownMenuItem(value: 'income', child: Text('Receita')),
+                                DropdownMenuItem(value: 'expense', child: Text('Despesa')),
+                              ],
+                              onChanged: (value) {
+                                if (value != null) {
+                                  typeController.text = value;
+                                  setDialogState(() {});
+                                }
+                              },
+                              validator: (value) =>
+                                  value?.isEmpty ?? true ? 'Tipo é obrigatório' : null,
+                            ),
+                            const SizedBox(height: 20),
+                            // Seletor de cores
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Cor',
+                                  style: AppTypography.labelMedium.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Wrap(
+                                  spacing: 12,
+                                  runSpacing: 12,
+                                  children: presetColors.map((color) {
+                                    final isSelected = colorController.text == color;
+                                    return GestureDetector(
+                                      onTap: () {
+                                        colorController.text = color;
+                                        setDialogState(() {});
+                                      },
+                                      child: Container(
+                                        width: 44,
+                                        height: 44,
+                                        decoration: BoxDecoration(
+                                          color: _parseColor(color),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: isSelected
+                                                ? AppColors.primary
+                                                : Colors.transparent,
+                                            width: isSelected ? 3 : 0,
+                                          ),
+                                          boxShadow: isSelected
+                                              ? [
+                                                  BoxShadow(
+                                                    color: _parseColor(color).withOpacity(0.3),
+                                                    blurRadius: 8,
+                                                    spreadRadius: 2,
+                                                  ),
+                                                ]
+                                              : null,
+                                        ),
+                                        child: isSelected
+                                            ? const Icon(Icons.check, color: Colors.white, size: 24)
+                                            : null,
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                                const SizedBox(height: 12),
+                                TextFormField(
+                                  controller: colorController,
+                                  decoration: InputDecoration(
+                                    labelText: 'Cor (hex)',
+                                    filled: true,
+                                    fillColor: AppColors.background,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: AppColors.border),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: AppColors.border),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: AppColors.primary, width: 2),
+                                    ),
+                                    prefixIcon: Icon(Icons.palette, color: AppColors.primary),
+                                    helperText: 'Ex: #3B82F6',
+                                    helperStyle: AppTypography.caption,
+                                  ),
+                                  style: AppTypography.bodyMedium,
+                                  onChanged: (_) => setDialogState(() {}),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                        onChanged: (_) => setDialogState(() {}),
                       ),
-                    ],
-                  ),
-                ],
+                    ),
+                    // Botões
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          top: BorderSide(color: AppColors.border, width: 1),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                              Future.microtask(() {
+                                nameController.dispose();
+                                typeController.dispose();
+                                colorController.dispose();
+                              });
+                            },
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            ),
+                            child: Text(
+                              'Cancelar',
+                              style: AppTypography.labelLarge.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          FilledButton(
+                            onPressed: () async {
+                              if (formKey.currentState!.validate()) {
+                                final name = nameController.text;
+                                final type = typeController.text;
+                                final color = colorController.text.isNotEmpty ? colorController.text : null;
+                                
+                                Navigator.of(context).pop();
+                                Future.microtask(() {
+                                  nameController.dispose();
+                                  typeController.dispose();
+                                  colorController.dispose();
+                                });
+                                await _updateCategory(category.id, name, type, color);
+                              }
+                            },
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.secondary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Text(
+                              'Salvar',
+                              style: AppTypography.labelLarge.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              // Dispose controllers após fechar o diálogo
-              Future.microtask(() {
-                nameController.dispose();
-                typeController.dispose();
-                colorController.dispose();
-              });
-            },
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              if (formKey.currentState!.validate()) {
-                // Salvar valores antes de fechar
-                final name = nameController.text;
-                final type = typeController.text;
-                final color = colorController.text.isNotEmpty ? colorController.text : null;
-                
-                // Fechar diálogo primeiro
-                Navigator.of(context).pop();
-                // Dispose controllers após fechar
-                Future.microtask(() {
-                  nameController.dispose();
-                  typeController.dispose();
-                  colorController.dispose();
-                });
-                // Atualizar categoria com valores salvos
-                await _updateCategory(category.id, name, type, color);
-              }
-            },
-            child: const Text('Salvar'),
-          ),
-        ],
-      ),
         ),
+      ),
     );
   }
 

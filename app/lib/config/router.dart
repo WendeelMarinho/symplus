@@ -25,6 +25,7 @@ import '../features/settings/presentation/pages/settings_page.dart';
 import '../features/subscription/presentation/pages/subscription_page.dart';
 import '../features/transactions/presentation/pages/transactions_page.dart';
 import '../features/transactions/presentation/pages/transaction_detail_page.dart';
+import '../features/transactions/presentation/pages/transaction_form_page.dart';
 import '../features/overview/presentation/pages/overview_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -190,6 +191,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
+        path: '/app/transactions/new',
+        name: 'transaction-new',
+        builder: (context, state) {
+          return const TransactionFormPage();
+        },
+      ),
+      GoRoute(
         path: '/app/transactions/:id',
         name: 'transaction-detail',
         builder: (context, state) {
@@ -198,6 +206,15 @@ final routerProvider = Provider<GoRouter>((ref) {
             currentRoute: MenuCatalog.transactions,
             child: TransactionDetailPage(transactionId: transactionId),
           );
+        },
+      ),
+      GoRoute(
+        path: '/app/transactions/:id/edit',
+        name: 'transaction-edit',
+        builder: (context, state) {
+          final transactionId = int.parse(state.pathParameters['id']!);
+          // Carregar transação e passar para o formulário
+          return TransactionFormPage(transactionId: transactionId);
         },
       ),
       GoRoute(

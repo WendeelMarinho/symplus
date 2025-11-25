@@ -12,6 +12,11 @@ import '../../../../core/accessibility/responsive_utils.dart';
 import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/services/avatar_service.dart';
 import '../../../../core/auth/auth_provider.dart';
+import '../../../../core/design/app_colors.dart';
+import '../../../../core/design/app_typography.dart';
+import '../../../../core/design/app_spacing.dart';
+import '../../../../core/design/app_borders.dart';
+import '../../../../core/accessibility/accessible_widgets.dart';
 import 'package:file_picker/file_picker.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
@@ -116,139 +121,233 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         PageHeader(
           title: context.t('settings.title'),
           subtitle: context.t('settings.subtitle'),
-          breadcrumbs: [
-            context.t('settings.breadcrumbs_0'),
-            context.t('settings.breadcrumbs_1'),
-          ],
         ),
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            padding: AppSpacing.pagePadding(context),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // Aparência
-                Card(
+                AccessibleCard(
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.all(AppSpacing.lg),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            Icon(
-                              Icons.palette,
-                              color: Theme.of(context).colorScheme.primary,
+                            Container(
+                              padding: const EdgeInsets.all(AppSpacing.sm),
+                              decoration: BoxDecoration(
+                                color: AppColors.secondary.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(AppBorders.smallRadius),
+                              ),
+                              child: Icon(
+                                Icons.palette,
+                                color: AppColors.secondary,
+                                size: 24,
+                              ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: AppSpacing.sm),
                             Text(
                               context.t('settings.appearance.title'),
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                              style: AppTypography.sectionTitle,
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
-                        ListTile(
-                          title: Text(context.t('settings.appearance.theme')),
-                          subtitle: Text(context.t('settings.appearance.theme_description')),
-                          trailing: DropdownButton<ThemeMode>(
-                            value: _themeMode,
-                            items: [
-                              DropdownMenuItem(
-                                value: ThemeMode.system,
-                                child: Text(context.t('settings.appearance.system')),
+                        const SizedBox(height: AppSpacing.md),
+                        Row(
+                          children: [
+                            Icon(Icons.palette, color: AppColors.textSecondary, size: 20),
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    context.t('settings.appearance.theme'),
+                                    style: AppTypography.bodyMedium.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: AppSpacing.xs / 2),
+                                  Text(
+                                    context.t('settings.appearance.theme_description'),
+                                    style: AppTypography.caption.copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              DropdownMenuItem(
-                                value: ThemeMode.light,
-                                child: Text(context.t('settings.appearance.light')),
+                            ),
+                            const SizedBox(width: AppSpacing.md),
+                            SizedBox(
+                              width: 160,
+                              child: DropdownButtonFormField<ThemeMode>(
+                                value: _themeMode,
+                                decoration: InputDecoration(
+                                  filled: true,
+                                  fillColor: AppColors.background,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: AppColors.border),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: AppColors.border),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: AppColors.primary, width: 2),
+                                  ),
+                                ),
+                                style: AppTypography.bodyMedium,
+                                items: [
+                                  DropdownMenuItem(
+                                    value: ThemeMode.system,
+                                    child: Text(context.t('settings.appearance.system')),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: ThemeMode.light,
+                                    child: Text(context.t('settings.appearance.light')),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: ThemeMode.dark,
+                                    child: Text(context.t('settings.appearance.dark')),
+                                  ),
+                                ],
+                                onChanged: (value) {
+                                  if (value != null) {
+                                    _saveThemeMode(value);
+                                  }
+                                },
                               ),
-                              DropdownMenuItem(
-                                value: ThemeMode.dark,
-                                child: Text(context.t('settings.appearance.dark')),
-                              ),
-                            ],
-                            onChanged: (value) {
-                              if (value != null) {
-                                _saveThemeMode(value);
-                              }
-                            },
-                          ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.md),
 
                 // Idioma e Localização
-                Card(
+                AccessibleCard(
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.all(AppSpacing.lg),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            Icon(
-                              Icons.language,
-                              color: Theme.of(context).colorScheme.primary,
+                            Container(
+                              padding: const EdgeInsets.all(AppSpacing.sm),
+                              decoration: BoxDecoration(
+                                color: AppColors.info.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(AppBorders.smallRadius),
+                              ),
+                              child: Icon(
+                                Icons.language,
+                                color: AppColors.info,
+                                size: 24,
+                              ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: AppSpacing.sm),
                             Text(
                               context.t('settings.language.title'),
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                              style: AppTypography.sectionTitle,
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: AppSpacing.md),
                         Consumer(
                           builder: (context, ref, child) {
                             final localeState = ref.watch(localeProvider);
                             final localeNotifier = ref.read(localeProvider.notifier);
 
-                            return ListTile(
-                              title: Text(context.t('settings.language.language')),
-                              subtitle: Text(context.t('settings.language.language_description')),
-                              trailing: DropdownButton<AppLocale>(
-                                value: localeState.locale,
-                                items: const [
-                                  DropdownMenuItem(
-                                    value: AppLocale.pt,
-                                    child: Text('Português (Brasil)'),
+                            return Row(
+                              children: [
+                                Icon(Icons.language, color: AppColors.textSecondary, size: 20),
+                                const SizedBox(width: AppSpacing.sm),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        context.t('settings.language.language'),
+                                        style: AppTypography.bodyMedium.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      const SizedBox(height: AppSpacing.xs / 2),
+                                      Text(
+                                        context.t('settings.language.language_description'),
+                                        style: AppTypography.caption.copyWith(
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  DropdownMenuItem(
-                                    value: AppLocale.en,
-                                    child: Text('English (US)'),
+                                ),
+                                const SizedBox(width: AppSpacing.md),
+                                SizedBox(
+                                  width: 160,
+                                  child: DropdownButtonFormField<AppLocale>(
+                                    value: localeState.locale,
+                                    decoration: InputDecoration(
+                                      filled: true,
+                                      fillColor: AppColors.background,
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(color: AppColors.border),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(color: AppColors.border),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(color: AppColors.primary, width: 2),
+                                      ),
+                                    ),
+                                    style: AppTypography.bodyMedium,
+                                    items: const [
+                                      DropdownMenuItem(
+                                        value: AppLocale.pt,
+                                        child: Text('Português (Brasil)'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: AppLocale.en,
+                                        child: Text('English (US)'),
+                                      ),
+                                    ],
+                                    onChanged: (value) async {
+                                      if (value != null) {
+                                        await localeNotifier.setLocale(value);
+                                        TelemetryService.logAction(
+                                          'settings.language_changed',
+                                          metadata: {'locale': value.code},
+                                        );
+                                        if (mounted) {
+                                          ToastService.showSuccess(
+                                            context,
+                                            context.t('settings.language.language_changed', params: {
+                                              'language': value == AppLocale.pt
+                                                  ? context.t('settings.language.pt_br')
+                                                  : context.t('settings.language.en_us'),
+                                            }),
+                                          );
+                                        }
+                                      }
+                                    },
                                   ),
-                                ],
-                                onChanged: (value) async {
-                                  if (value != null) {
-                                    await localeNotifier.setLocale(value);
-                                    TelemetryService.logAction(
-                                      'settings.language_changed',
-                                      metadata: {'locale': value.code},
-                                    );
-                                    if (mounted) {
-                                      ToastService.showSuccess(
-                                        context,
-                                        context.t('settings.language.language_changed', params: {
-                                          'language': value == AppLocale.pt
-                                              ? context.t('settings.language.pt_br')
-                                              : context.t('settings.language.en_us'),
-                                        }),
-                                      );
-                                    }
-                                  }
-                                },
-                              ),
+                                ),
+                              ],
                             );
                           },
                         ),
-                        const Divider(),
+                        const Divider(height: AppSpacing.xl),
                         // Avatar/Logo
                         Consumer(
                           builder: (context, ref, child) {
@@ -258,66 +357,114 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                             final isCompany = authState.organizationName != null && 
                                              authState.organizationName!.isNotEmpty;
 
-                            return ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: UserAvatar(
-                                radius: 30,
-                                showEditButton: true,
-                                onEditTap: () => _pickAndUploadAvatar(context, ref, avatarNotifier),
-                              ),
-                              title: Text(isCompany ? 'Logo da Empresa' : 'Foto do Usuário'),
-                              subtitle: Text(
-                                isCompany 
-                                    ? 'Clique no ícone para alterar o logo'
-                                    : 'Clique no ícone para alterar sua foto',
-                              ),
-                              trailing: avatarState.isLoading
-                                  ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(strokeWidth: 2),
-                                    )
-                                  : null,
+                            return Row(
+                              children: [
+                                UserAvatar(
+                                  radius: 30,
+                                  showEditButton: true,
+                                  onEditTap: () => _pickAndUploadAvatar(context, ref, avatarNotifier),
+                                ),
+                                const SizedBox(width: AppSpacing.md),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        isCompany ? 'Logo da Empresa' : 'Foto do Usuário',
+                                        style: AppTypography.bodyMedium.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      const SizedBox(height: AppSpacing.xs / 2),
+                                      Text(
+                                        isCompany 
+                                            ? 'Clique no ícone para alterar o logo'
+                                            : 'Clique no ícone para alterar sua foto',
+                                        style: AppTypography.caption.copyWith(
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (avatarState.isLoading)
+                                  const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  ),
+                              ],
                             );
                           },
                         ),
-                        const Divider(),
+                        const Divider(height: AppSpacing.xl),
                         Consumer(
                           builder: (context, ref, child) {
                             final currencyState = ref.watch(currencyProvider);
                             final currencyNotifier = ref.read(currencyProvider.notifier);
 
-                            return ListTile(
-                              title: const Text('Moeda Padrão'),
-                              subtitle: Text('Moeda usada por padrão: ${currencyState.name}'),
-                              trailing: DropdownButton<CurrencyType>(
-                                value: currencyState.currency,
-                                items: const [
-                                  DropdownMenuItem(
-                                    value: CurrencyType.brl,
-                                    child: Text('BRL - Real Brasileiro'),
+                            return Row(
+                              children: [
+                                Icon(Icons.attach_money, color: AppColors.textSecondary, size: 20),
+                                const SizedBox(width: AppSpacing.sm),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Moeda Padrão',
+                                        style: AppTypography.bodyMedium.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      const SizedBox(height: AppSpacing.xs / 2),
+                                      Text(
+                                        'Moeda usada por padrão: ${currencyState.name}',
+                                        style: AppTypography.caption.copyWith(
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  DropdownMenuItem(
-                                    value: CurrencyType.usd,
-                                    child: Text('USD - Dólar Americano'),
+                                ),
+                                const SizedBox(width: AppSpacing.md),
+                                SizedBox(
+                                  width: 150,
+                                  child: DropdownButtonFormField<CurrencyType>(
+                                    value: currencyState.currency,
+                                    decoration: InputDecoration(
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(AppBorders.inputRadius),
+                                      ),
+                                    ),
+                                    items: const [
+                                      DropdownMenuItem(
+                                        value: CurrencyType.brl,
+                                        child: Text('BRL - Real Brasileiro'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: CurrencyType.usd,
+                                        child: Text('USD - Dólar Americano'),
+                                      ),
+                                    ],
+                                    onChanged: (value) async {
+                                      if (value != null) {
+                                        await currencyNotifier.setCurrency(value);
+                                        TelemetryService.logAction(
+                                          'settings.currency_changed',
+                                          metadata: {'currency': value.name},
+                                        );
+                                        if (mounted) {
+                                          ToastService.showSuccess(
+                                            context,
+                                            'Moeda alterada para ${value == CurrencyType.brl ? 'Real Brasileiro' : 'Dólar Americano'}',
+                                          );
+                                        }
+                                      }
+                                    },
                                   ),
-                                ],
-                                onChanged: (value) async {
-                                  if (value != null) {
-                                    await currencyNotifier.setCurrency(value);
-                                    TelemetryService.logAction(
-                                      'settings.currency_changed',
-                                      metadata: {'currency': value.name},
-                                    );
-                                    if (mounted) {
-                                      ToastService.showSuccess(
-                                        context,
-                                        'Moeda alterada para ${value == CurrencyType.brl ? 'Real Brasileiro' : 'Dólar Americano'}',
-                                      );
-                                    }
-                                  }
-                                },
-                              ),
+                                ),
+                              ],
                             );
                           },
                         ),

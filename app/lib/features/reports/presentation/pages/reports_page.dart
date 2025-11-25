@@ -11,6 +11,12 @@ import '../../../../core/widgets/error_state.dart';
 import '../../../../core/auth/auth_provider.dart';
 import '../../../../core/rbac/permission_helper.dart';
 import '../../../../core/rbac/permissions_catalog.dart';
+import '../../../../core/accessibility/responsive_utils.dart';
+import '../../../../core/design/app_colors.dart';
+import '../../../../core/design/app_typography.dart';
+import '../../../../core/design/app_spacing.dart';
+import '../../../../core/design/app_borders.dart';
+import '../../../../core/accessibility/accessible_widgets.dart';
 import '../../data/services/report_service.dart';
 import '../../data/models/pl_report.dart';
 
@@ -151,71 +157,163 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
         PageHeader(
           title: 'Relatórios (P&L)',
           subtitle: 'Visualize relatórios financeiros e análises',
-          breadcrumbs: const ['Financeiro', 'Relatórios'],
           actions: [
             if (_report != null) ...[
               IconButton(
                 icon: const Icon(Icons.file_download),
                 tooltip: 'Exportar CSV',
                 onPressed: _exportToCSV,
+                color: AppColors.textSecondary,
               ),
               IconButton(
                 icon: const Icon(Icons.picture_as_pdf),
                 tooltip: 'Exportar PDF',
                 onPressed: _exportToPDF,
+                color: AppColors.textSecondary,
               ),
             ],
           ],
         ),
         // Filtros
-        Card(
-          margin: const EdgeInsets.all(16),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _selectDateRange,
-                    icon: const Icon(Icons.calendar_today),
-                    label: Text(
-                      '${DateFormat('dd/MM/yyyy').format(_fromDate)} - ${DateFormat('dd/MM/yyyy').format(_toDate)}',
+        Padding(
+          padding: AppSpacing.pagePadding(context),
+          child: AccessibleCard(
+            child: Padding(
+              padding: EdgeInsets.all(AppSpacing.md),
+              child: ResponsiveUtils.isMobile(context)
+                  ? Column(
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: _selectDateRange,
+                          icon: const Icon(Icons.calendar_today),
+                          label: Text(
+                            '${DateFormat('dd/MM/yyyy').format(_fromDate)} - ${DateFormat('dd/MM/yyyy').format(_toDate)}',
+                            style: AppTypography.label,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                value: _groupBy,
+                                decoration: InputDecoration(
+                                  filled: true,
+                                  fillColor: AppColors.surface,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(AppBorders.inputRadius),
+                                    borderSide: BorderSide(color: AppColors.border),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(AppBorders.inputRadius),
+                                    borderSide: BorderSide(color: AppColors.border),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(AppBorders.inputRadius),
+                                    borderSide: BorderSide(color: AppColors.primary, width: 2),
+                                  ),
+                                ),
+                                items: const [
+                                  DropdownMenuItem(value: 'month', child: Text('Por Mês')),
+                                  DropdownMenuItem(value: 'category', child: Text('Por Categoria')),
+                                ],
+                                onChanged: (value) {
+                                  if (value != null) {
+                                    setState(() {
+                                      _groupBy = value;
+                                    });
+                                    _generateReport();
+                                  }
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            IconButton(
+                              icon: Icon(_showChart ? Icons.table_chart : Icons.bar_chart),
+                              onPressed: () {
+                                setState(() {
+                                  _showChart = !_showChart;
+                                });
+                              },
+                              tooltip: _showChart ? 'Mostrar Tabela' : 'Mostrar Gráfico',
+                              color: AppColors.textSecondary,
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            AccessibleFilledButton.icon(
+                              onPressed: _generateReport,
+                              icon: Icons.refresh,
+                              label: 'Atualizar',
+                            ),
+                          ],
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _selectDateRange,
+                            icon: const Icon(Icons.calendar_today),
+                            label: Text(
+                              '${DateFormat('dd/MM/yyyy').format(_fromDate)} - ${DateFormat('dd/MM/yyyy').format(_toDate)}',
+                              style: AppTypography.label,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        SizedBox(
+                          width: 200,
+                          child: DropdownButtonFormField<String>(
+                            value: _groupBy,
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: AppColors.surface,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(AppBorders.inputRadius),
+                                borderSide: BorderSide(color: AppColors.border),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(AppBorders.inputRadius),
+                                borderSide: BorderSide(color: AppColors.border),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(AppBorders.inputRadius),
+                                borderSide: BorderSide(color: AppColors.primary, width: 2),
+                              ),
+                            ),
+                            items: const [
+                              DropdownMenuItem(value: 'month', child: Text('Por Mês')),
+                              DropdownMenuItem(value: 'category', child: Text('Por Categoria')),
+                            ],
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() {
+                                  _groupBy = value;
+                                });
+                                _generateReport();
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        IconButton(
+                          icon: Icon(_showChart ? Icons.table_chart : Icons.bar_chart),
+                          onPressed: () {
+                            setState(() {
+                              _showChart = !_showChart;
+                            });
+                          },
+                          tooltip: _showChart ? 'Mostrar Tabela' : 'Mostrar Gráfico',
+                          color: AppColors.textSecondary,
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        AccessibleFilledButton.icon(
+                          onPressed: _generateReport,
+                          icon: Icons.refresh,
+                          label: 'Atualizar',
+                        ),
+                      ],
                     ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                DropdownButton<String>(
-                  value: _groupBy,
-                  items: const [
-                    DropdownMenuItem(value: 'month', child: Text('Por Mês')),
-                    DropdownMenuItem(value: 'category', child: Text('Por Categoria')),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() {
-                        _groupBy = value;
-                      });
-                      _generateReport();
-                    }
-                  },
-                ),
-                const SizedBox(width: 16),
-                IconButton(
-                  icon: Icon(_showChart ? Icons.table_chart : Icons.bar_chart),
-                  onPressed: () {
-                    setState(() {
-                      _showChart = !_showChart;
-                    });
-                  },
-                  tooltip: _showChart ? 'Mostrar Tabela' : 'Mostrar Gráfico',
-                ),
-                const SizedBox(width: 16),
-                FilledButton.icon(
-                  onPressed: _generateReport,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Atualizar'),
-                ),
-              ],
             ),
           ),
         ),
@@ -230,131 +328,210 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
                   : _report == null
                       ? const Center(child: Text('Nenhum dado disponível'))
                       : SingleChildScrollView(
-                          padding: const EdgeInsets.all(16),
+                          padding: AppSpacing.pagePadding(context),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               // Resumo
-                              Card(
+                              AccessibleCard(
                                 child: Padding(
-                                  padding: const EdgeInsets.all(16),
+                                  padding: EdgeInsets.all(AppSpacing.lg),
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'Resumo do Período',
-                                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                              fontWeight: FontWeight.bold,
-                                            ),
+                                        style: AppTypography.sectionTitle,
                                       ),
-                                      const SizedBox(height: 16),
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: _SummaryCard(
-                                              title: 'Receitas',
-                                              value: _report!.totalIncome,
-                                              color: Colors.green,
-                                              icon: Icons.trending_up,
+                                      const SizedBox(height: AppSpacing.md),
+                                      ResponsiveUtils.isMobile(context)
+                                          ? Column(
+                                              children: [
+                                                _SummaryCard(
+                                                  title: 'Receitas',
+                                                  value: _report!.totalIncome,
+                                                  color: AppColors.income,
+                                                  icon: Icons.trending_up,
+                                                ),
+                                                const SizedBox(height: AppSpacing.sm),
+                                                _SummaryCard(
+                                                  title: 'Despesas',
+                                                  value: _report!.totalExpense,
+                                                  color: AppColors.expense,
+                                                  icon: Icons.trending_down,
+                                                ),
+                                                const SizedBox(height: AppSpacing.sm),
+                                                _SummaryCard(
+                                                  title: 'Lucro Líquido',
+                                                  value: _report!.netProfit,
+                                                  color: _report!.netProfit >= 0
+                                                      ? AppColors.success
+                                                      : AppColors.error,
+                                                  icon: Icons.account_balance,
+                                                ),
+                                              ],
+                                            )
+                                          : Row(
+                                              children: [
+                                                Expanded(
+                                                  child: _SummaryCard(
+                                                    title: 'Receitas',
+                                                    value: _report!.totalIncome,
+                                                    color: AppColors.income,
+                                                    icon: Icons.trending_up,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: AppSpacing.md),
+                                                Expanded(
+                                                  child: _SummaryCard(
+                                                    title: 'Despesas',
+                                                    value: _report!.totalExpense,
+                                                    color: AppColors.expense,
+                                                    icon: Icons.trending_down,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: AppSpacing.md),
+                                                Expanded(
+                                                  child: _SummaryCard(
+                                                    title: 'Lucro Líquido',
+                                                    value: _report!.netProfit,
+                                                    color: _report!.netProfit >= 0
+                                                        ? AppColors.success
+                                                        : AppColors.error,
+                                                    icon: Icons.account_balance,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
-                                          ),
-                                          const SizedBox(width: 16),
-                                          Expanded(
-                                            child: _SummaryCard(
-                                              title: 'Despesas',
-                                              value: _report!.totalExpense,
-                                              color: Colors.red,
-                                              icon: Icons.trending_down,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 16),
-                                          Expanded(
-                                            child: _SummaryCard(
-                                              title: 'Lucro Líquido',
-                                              value: _report!.netProfit,
-                                              color: _report!.netProfit >= 0
-                                                  ? Colors.green
-                                                  : Colors.red,
-                                              icon: Icons.account_balance,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 16),
+                                      const SizedBox(height: AppSpacing.md),
                                       Text(
                                         'Despesas representam ${_report!.expenseOverIncomePercent.toStringAsFixed(1)}% das receitas',
-                                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .onSurface
-                                                  .withOpacity(0.7),
-                                            ),
+                                        style: AppTypography.bodyMedium.copyWith(
+                                          color: AppColors.textSecondary,
+                                        ),
                                       ),
                                     ],
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 16),
+                              const SizedBox(height: AppSpacing.md),
 
                               // Gráfico de barras empilhadas
-                              Card(
+                              AccessibleCard(
                                 child: Padding(
-                                  padding: const EdgeInsets.all(16),
+                                  padding: EdgeInsets.all(AppSpacing.lg),
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text(
-                                            _groupBy == 'month'
-                                                ? 'Receitas x Despesas por Mês'
-                                                : 'Receitas x Despesas por Categoria',
-                                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                                  fontWeight: FontWeight.bold,
+                                      ResponsiveUtils.isMobile(context)
+                                          ? Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  _groupBy == 'month'
+                                                      ? 'Receitas x Despesas por Mês'
+                                                      : 'Receitas x Despesas por Categoria',
+                                                  style: AppTypography.sectionTitle,
                                                 ),
-                                          ),
-                                          Row(
-                                            children: [
-                                              Container(
-                                                width: 12,
-                                                height: 12,
-                                                decoration: BoxDecoration(
-                                                  color: Colors.green,
-                                                  borderRadius: BorderRadius.circular(2),
+                                                const SizedBox(height: AppSpacing.sm),
+                                                Row(
+                                                  children: [
+                                                    Container(
+                                                      width: 12,
+                                                      height: 12,
+                                                      decoration: BoxDecoration(
+                                                        color: AppColors.income,
+                                                        borderRadius: BorderRadius.circular(AppBorders.smallRadius),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: AppSpacing.xs),
+                                                    Text('Receitas', style: AppTypography.caption),
+                                                    const SizedBox(width: AppSpacing.md),
+                                                    Container(
+                                                      width: 12,
+                                                      height: 12,
+                                                      decoration: BoxDecoration(
+                                                        color: AppColors.expense,
+                                                        borderRadius: BorderRadius.circular(AppBorders.smallRadius),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: AppSpacing.xs),
+                                                    Text('Despesas', style: AppTypography.caption),
+                                                  ],
                                                 ),
-                                              ),
-                                              const SizedBox(width: 4),
-                                              const Text('Receitas', style: TextStyle(fontSize: 12)),
-                                              const SizedBox(width: 16),
-                                              Container(
-                                                width: 12,
-                                                height: 12,
-                                                decoration: BoxDecoration(
-                                                  color: Colors.red,
-                                                  borderRadius: BorderRadius.circular(2),
+                                              ],
+                                            )
+                                          : Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                Flexible(
+                                                  child: Text(
+                                                    _groupBy == 'month'
+                                                        ? 'Receitas x Despesas por Mês'
+                                                        : 'Receitas x Despesas por Categoria',
+                                                    style: AppTypography.sectionTitle,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
                                                 ),
-                                              ),
-                                              const SizedBox(width: 4),
-                                              const Text('Despesas', style: TextStyle(fontSize: 12)),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 16),
-                                      SizedBox(
-                                        height: 350,
-                                        child: _buildStackedBarChart(),
+                                                Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Container(
+                                                      width: 12,
+                                                      height: 12,
+                                                      decoration: BoxDecoration(
+                                                        color: AppColors.income,
+                                                        borderRadius: BorderRadius.circular(AppBorders.smallRadius),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: AppSpacing.xs),
+                                                    Text('Receitas', style: AppTypography.caption),
+                                                    const SizedBox(width: AppSpacing.md),
+                                                    Container(
+                                                      width: 12,
+                                                      height: 12,
+                                                      decoration: BoxDecoration(
+                                                        color: AppColors.expense,
+                                                        borderRadius: BorderRadius.circular(AppBorders.smallRadius),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: AppSpacing.xs),
+                                                    Text('Despesas', style: AppTypography.caption),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                      const SizedBox(height: AppSpacing.md),
+                                      ConstrainedBox(
+                                        constraints: const BoxConstraints(
+                                          minHeight: 300,
+                                          maxHeight: 400,
+                                        ),
+                                        child: LayoutBuilder(
+                                          builder: (context, constraints) {
+                                            final chartWidth = constraints.maxWidth > 0 && constraints.maxWidth.isFinite
+                                                ? constraints.maxWidth
+                                                : 800.0;
+                                            final chartHeight = constraints.maxHeight > 0 && constraints.maxHeight.isFinite
+                                                ? constraints.maxHeight
+                                                : 400.0;
+                                            return SizedBox(
+                                              height: chartHeight,
+                                              width: chartWidth,
+                                              child: _buildStackedBarChart(),
+                                            );
+                                          },
+                                        ),
                                       ),
                                     ],
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 16),
+                              const SizedBox(height: AppSpacing.md),
                               // Tabela de resumo
-                              Card(
+                              AccessibleCard(
                                 child: Padding(
-                                  padding: const EdgeInsets.all(16),
+                                  padding: EdgeInsets.all(AppSpacing.lg),
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
@@ -362,21 +539,19 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
                                         _groupBy == 'month'
                                             ? 'Detalhamento Mensal'
                                             : 'Detalhamento por Categoria',
-                                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                              fontWeight: FontWeight.bold,
-                                            ),
+                                        style: AppTypography.sectionTitle,
                                       ),
-                                      const SizedBox(height: 16),
+                                      const SizedBox(height: AppSpacing.md),
                                       _buildTable(),
                                     ],
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 16),
+                              const SizedBox(height: AppSpacing.md),
                               // Card de regras de alerta (placeholder)
-                              Card(
+                              AccessibleCard(
                                 child: Padding(
-                                  padding: const EdgeInsets.all(16),
+                                  padding: EdgeInsets.all(AppSpacing.lg),
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
@@ -386,18 +561,16 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
                                           const SizedBox(width: 8),
                                           Text(
                                             'Regras de Alerta',
-                                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                                  fontWeight: FontWeight.bold,
-                                                ),
+                                            style: AppTypography.sectionTitle,
                                           ),
                                         ],
                                       ),
-                                      const SizedBox(height: 8),
+                                      const SizedBox(height: AppSpacing.sm),
                                       Text(
                                         'Configure alertas para receber notificações quando despesas ultrapassarem limites definidos.',
-                                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                                            ),
+                                        style: AppTypography.bodyMedium.copyWith(
+                                          color: AppColors.textSecondary,
+                                        ),
                                       ),
                                       const SizedBox(height: 8),
                                       TextButton.icon(
@@ -435,106 +608,106 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
     );
 
     return BarChart(
-      BarChartData(
-        alignment: BarChartAlignment.spaceBetween,
-        maxY: maxValue * 1.2,
-        groupsSpace: 16,
-        barGroups: series.asMap().entries.map((entry) {
-          final index = entry.key;
-          final item = entry.value;
-          final income = (item['income'] as num).toDouble();
-          final expense = (item['expense'] as num).toDouble();
-          
-          return BarChartGroupData(
-            x: index,
-            barRods: [
-              // Receitas (verde) - parte inferior
-              BarChartRodData(
-                fromY: 0,
-                toY: income,
-                color: Colors.green,
-                width: 20,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+        BarChartData(
+          alignment: BarChartAlignment.spaceBetween,
+          maxY: maxValue * 1.2,
+          groupsSpace: 16,
+          barGroups: series.asMap().entries.map((entry) {
+            final index = entry.key;
+            final item = entry.value;
+            final income = (item['income'] as num).toDouble();
+            final expense = (item['expense'] as num).toDouble();
+            
+            return BarChartGroupData(
+              x: index,
+              barRods: [
+                // Receitas (verde) - parte inferior
+                BarChartRodData(
+                  fromY: 0,
+                  toY: income,
+                  color: Colors.green,
+                  width: 20,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                ),
+                // Despesas (vermelho) - empilhado sobre receitas
+                BarChartRodData(
+                  fromY: income,
+                  toY: income + expense,
+                  color: Colors.red,
+                  width: 20,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                ),
+              ],
+            );
+          }).toList(),
+          titlesData: FlTitlesData(
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 60,
+                getTitlesWidget: (value, meta) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Text(
+                      _formatCurrency(value),
+                      style: const TextStyle(fontSize: 10),
+                      textAlign: TextAlign.right,
+                    ),
+                  );
+                },
               ),
-              // Despesas (vermelho) - empilhado sobre receitas
-              BarChartRodData(
-                fromY: income,
-                toY: income + expense,
-                color: Colors.red,
-                width: 20,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+            ),
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                getTitlesWidget: (value, meta) {
+                  if (value.toInt() >= series.length) return const Text('');
+                  final label = _groupBy == 'month'
+                      ? series[value.toInt()]['month'] as String
+                      : (series[value.toInt()]['category_name'] as String).length > 10
+                          ? '${(series[value.toInt()]['category_name'] as String).substring(0, 10)}...'
+                          : series[value.toInt()]['category_name'] as String;
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      label,
+                      style: const TextStyle(fontSize: 10),
+                    ),
+                  );
+                },
               ),
-            ],
-          );
-        }).toList(),
-        titlesData: FlTitlesData(
-          leftTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 60,
-              getTitlesWidget: (value, meta) {
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Text(
-                    _formatCurrency(value),
-                    style: const TextStyle(fontSize: 10),
-                    textAlign: TextAlign.right,
-                  ),
+            ),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+          ),
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            horizontalInterval: maxValue / 5,
+          ),
+          borderData: FlBorderData(show: true),
+          barTouchData: BarTouchData(
+            touchTooltipData: BarTouchTooltipData(
+              tooltipRoundedRadius: 8,
+              tooltipBgColor: Colors.grey[800]!,
+              getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                final item = series[groupIndex];
+                final isIncome = rodIndex == 0;
+                final value = isIncome
+                    ? (item['income'] as num).toDouble()
+                    : (item['expense'] as num).toDouble();
+                return BarTooltipItem(
+                  '${isIncome ? "Receita" : "Despesa"}: ${_formatCurrency(value)}',
+                  const TextStyle(color: Colors.white, fontSize: 12),
                 );
               },
             ),
           ),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              getTitlesWidget: (value, meta) {
-                if (value.toInt() >= series.length) return const Text('');
-                final label = _groupBy == 'month'
-                    ? series[value.toInt()]['month'] as String
-                    : (series[value.toInt()]['category_name'] as String).length > 10
-                        ? '${(series[value.toInt()]['category_name'] as String).substring(0, 10)}...'
-                        : series[value.toInt()]['category_name'] as String;
-                return Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    label,
-                    style: const TextStyle(fontSize: 10),
-                  ),
-                );
-              },
-            ),
-          ),
-          topTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
-          rightTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
         ),
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          horizontalInterval: maxValue / 5,
-        ),
-        borderData: FlBorderData(show: true),
-        barTouchData: BarTouchData(
-          touchTooltipData: BarTouchTooltipData(
-            tooltipRoundedRadius: 8,
-            tooltipBgColor: Colors.grey[800]!,
-            getTooltipItem: (group, groupIndex, rod, rodIndex) {
-              final item = series[groupIndex];
-              final isIncome = rodIndex == 0;
-              final value = isIncome
-                  ? (item['income'] as num).toDouble()
-                  : (item['expense'] as num).toDouble();
-              return BarTooltipItem(
-                '${isIncome ? "Receita" : "Despesa"}: ${_formatCurrency(value)}',
-                const TextStyle(color: Colors.white, fontSize: 12),
-              );
-            },
-          ),
-        ),
-      ),
     );
   }
 
@@ -739,56 +912,79 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
       return const Center(child: Text('Sem dados para exibir'));
     }
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
-        columns: [
-          DataColumn(
-            label: Text(_groupBy == 'month' ? 'Mês' : 'Categoria'),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = (constraints.maxWidth > 0 && constraints.maxWidth.isFinite 
+            ? constraints.maxWidth 
+            : 600.0) as double;
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: 200,
+            maxHeight: 400,
+            minWidth: maxWidth,
+            maxWidth: maxWidth,
           ),
-          const DataColumn(
-            label: Text('Receitas'),
-            numeric: true,
-          ),
-          const DataColumn(
-            label: Text('Despesas'),
-            numeric: true,
-          ),
-          const DataColumn(
-            label: Text('Lucro Líquido'),
-            numeric: true,
-          ),
-        ],
-        rows: _report!.series.map((item) {
-          final label = _groupBy == 'month'
-              ? item['month'] as String
-              : item['category_name'] as String;
-          final income = (item['income'] as num).toDouble();
-          final expense = (item['expense'] as num).toDouble();
-          final net = (item['net'] as num).toDouble();
-
-          return DataRow(
-            cells: [
-              DataCell(Text(label)),
-              DataCell(Text(
-                _formatCurrency(income),
-                style: const TextStyle(color: Colors.green),
-              )),
-              DataCell(Text(
-                _formatCurrency(expense),
-                style: const TextStyle(color: Colors.red),
-              )),
-              DataCell(Text(
-                _formatCurrency(net),
-                style: TextStyle(
-                  color: net >= 0 ? Colors.green : Colors.red,
-                  fontWeight: FontWeight.bold,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.vertical,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minWidth: maxWidth,
                 ),
-              )),
-            ],
-          );
-        }).toList(),
-      ),
+                child: DataTable(
+                  columns: [
+                    DataColumn(
+                      label: Text(_groupBy == 'month' ? 'Mês' : 'Categoria'),
+                    ),
+                    const DataColumn(
+                      label: Text('Receitas'),
+                      numeric: true,
+                    ),
+                    const DataColumn(
+                      label: Text('Despesas'),
+                      numeric: true,
+                    ),
+                    const DataColumn(
+                      label: Text('Lucro Líquido'),
+                      numeric: true,
+                    ),
+                  ],
+                rows: _report!.series.map((item) {
+                  final label = _groupBy == 'month'
+                      ? item['month'] as String
+                      : item['category_name'] as String;
+                  final income = (item['income'] as num).toDouble();
+                  final expense = (item['expense'] as num).toDouble();
+                  final net = (item['net'] as num).toDouble();
+
+                  return DataRow(
+                    cells: [
+                      DataCell(Text(label)),
+                      DataCell(Text(
+                        _formatCurrency(income),
+                        style: const TextStyle(color: Colors.green),
+                      )),
+                      DataCell(Text(
+                        _formatCurrency(expense),
+                        style: const TextStyle(color: Colors.red),
+                      )),
+                      DataCell(Text(
+                        _formatCurrency(net),
+                        style: TextStyle(
+                          color: net >= 0 ? Colors.green : Colors.red,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      )),
+                    ],
+                  );
+                }).toList(),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -812,37 +1008,43 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: color, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                    ),
+    return AccessibleCard(
+      child: Padding(
+        padding: EdgeInsets.all(AppSpacing.md),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(AppBorders.smallRadius),
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _formatCurrency(value),
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.bold,
-                ),
-          ),
-        ],
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs / 2),
+                  Text(
+                    _formatCurrency(value),
+                    style: AppTypography.kpiValue.copyWith(
+                      fontSize: 20,
+                      color: color,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

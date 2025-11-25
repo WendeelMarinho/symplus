@@ -11,6 +11,12 @@ import '../../../../core/widgets/toast_service.dart';
 import '../../../../core/widgets/list_item_card.dart';
 import '../../../../core/widgets/confirm_dialog.dart';
 import '../../../../core/auth/auth_provider.dart';
+import '../../../../core/accessibility/responsive_utils.dart';
+import '../../../../core/design/app_colors.dart';
+import '../../../../core/design/app_typography.dart';
+import '../../../../core/design/app_spacing.dart';
+import '../../../../core/design/app_borders.dart';
+import '../../../../core/accessibility/accessible_widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/services/due_item_service.dart';
 import '../../data/models/due_item.dart';
@@ -363,16 +369,24 @@ class _DueItemsPageState extends ConsumerState<DueItemsPage> {
 
     final hasFilters = _filterStatus != null || _filterAccountId != null || _filterCategoryId != null;
 
+    // Calcular totais
+    final totalToPay = overdueItems
+        .where((item) => item.isPay)
+        .fold<double>(0.0, (sum, item) => sum + item.amount);
+    final totalToReceive = overdueItems
+        .where((item) => item.isReceive)
+        .fold<double>(0.0, (sum, item) => sum + item.amount);
+    final totalOverdue = totalToPay + totalToReceive;
+
     return Column(
       children: [
         PageHeader(
           title: 'Vencimentos',
           subtitle: 'Controle pagamentos e recebimentos a vencer',
-          breadcrumbs: const ['Financeiro', 'Vencimentos'],
           actions: [
             if (hasFilters)
               IconButton(
-                icon: const Icon(Icons.filter_alt),
+                icon: const Icon(Icons.clear),
                 onPressed: () {
                   setState(() {
                     _filterStatus = null;
@@ -383,10 +397,12 @@ class _DueItemsPageState extends ConsumerState<DueItemsPage> {
                   _loadDueItems();
                 },
                 tooltip: 'Remover filtros',
+                color: AppColors.textSecondary,
               ),
             PopupMenuButton<String>(
               icon: const Icon(Icons.filter_list),
               tooltip: 'Filtros rápidos',
+              color: AppColors.textSecondary,
               onSelected: (value) {
                 setState(() {
                   if (value == 'overdue') {
@@ -445,38 +461,94 @@ class _DueItemsPageState extends ConsumerState<DueItemsPage> {
                             });
                             return _loadDueItems();
                           },
-                          child: SingleChildScrollView(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Calendário mensal
-                                _buildMonthlyCalendar(context, _dueItems),
-                                const SizedBox(height: 16),
-                                // Lista "Esta semana"
-                                if (thisWeekItems.isNotEmpty) ...[
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                                    child: Text(
-                                      'Esta semana',
-                                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                          child: CustomScrollView(
+                            slivers: [
+                              // Cards de resumo
+                              if (_dueItems.isNotEmpty)
+                                SliverToBoxAdapter(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(AppSpacing.pagePadding(context).horizontal),
+                                    child: _buildSummaryCards(totalOverdue, totalToPay, totalToReceive),
+                                  ),
+                                ),
+                              // Calendário mensal
+                              SliverToBoxAdapter(
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: AppSpacing.pagePadding(context).horizontal,
+                                    vertical: AppSpacing.md,
+                                  ),
+                                  child: _buildMonthlyCalendar(context, _dueItems),
+                                ),
+                              ),
+                              // Lista "Esta semana"
+                              if (thisWeekItems.isNotEmpty)
+                                SliverToBoxAdapter(
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: AppSpacing.pagePadding(context).horizontal,
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Esta semana',
+                                          style: AppTypography.sectionTitle,
+                                        ),
+                                        const SizedBox(height: AppSpacing.sm),
+                                      ],
                                     ),
                                   ),
-                                  const SizedBox(height: 8),
-                                  ...thisWeekItems.map((item) => _buildDueItemCard(
-                                        item,
-                                        canEdit,
-                                        item.isOverdue || item.isOverdueStatus
-                                            ? Colors.red
-                                            : item.isPending
-                                                ? Colors.orange
-                                                : Colors.green,
-                                      )),
-                                  const SizedBox(height: 16),
-                                ],
-                              ],
-                            ),
+                                ),
+                              SliverList(
+                                delegate: SliverChildBuilderDelegate(
+                                  (context, index) {
+                                    final item = thisWeekItems[index];
+                                    return Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: AppSpacing.pagePadding(context).horizontal,
+                                        vertical: AppSpacing.xs,
+                                      ),
+                                      child: _buildDueItemCard(item, canEdit),
+                                    );
+                                  },
+                                  childCount: thisWeekItems.length,
+                                ),
+                              ),
+                              // Lista completa (se não estiver mostrando apenas esta semana)
+                              if (thisWeekItems.length < _dueItems.length)
+                                SliverToBoxAdapter(
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: AppSpacing.pagePadding(context).horizontal,
+                                      vertical: AppSpacing.md,
+                                    ),
+                                    child: Text(
+                                      'Todos os vencimentos',
+                                      style: AppTypography.sectionTitle,
+                                    ),
+                                  ),
+                                ),
+                              SliverList(
+                                delegate: SliverChildBuilderDelegate(
+                                  (context, index) {
+                                    final item = _dueItems[index];
+                                    // Pular itens já mostrados em "Esta semana"
+                                    if (thisWeekItems.contains(item)) {
+                                      return const SizedBox.shrink();
+                                    }
+                                    return Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: AppSpacing.pagePadding(context).horizontal,
+                                        vertical: AppSpacing.xs,
+                                      ),
+                                      child: _buildDueItemCard(item, canEdit),
+                                    );
+                                  },
+                                  childCount: _dueItems.length,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
         ),
@@ -497,10 +569,9 @@ class _DueItemsPageState extends ConsumerState<DueItemsPage> {
       itemsByDate.putIfAbsent(date, () => []).add(item);
     }
 
-    return Card(
-      margin: const EdgeInsets.all(16),
+    return AccessibleCard(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(AppSpacing.lg),
         child: Column(
           children: [
             // Header do calendário
@@ -516,12 +587,11 @@ class _DueItemsPageState extends ConsumerState<DueItemsPage> {
                     });
                     _loadDueItems();
                   },
+                  color: AppColors.textSecondary,
                 ),
                 Text(
                   DateFormat('MMMM yyyy', 'pt_BR').format(_selectedMonth),
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                  style: AppTypography.sectionTitle,
                 ),
                 IconButton(
                   icon: const Icon(Icons.chevron_right),
@@ -532,6 +602,7 @@ class _DueItemsPageState extends ConsumerState<DueItemsPage> {
                     });
                     _loadDueItems();
                   },
+                  color: AppColors.textSecondary,
                 ),
               ],
             ),
@@ -543,9 +614,10 @@ class _DueItemsPageState extends ConsumerState<DueItemsPage> {
                         child: Center(
                           child: Text(
                             day,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                            style: AppTypography.labelMedium.copyWith(
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ))
@@ -568,18 +640,23 @@ class _DueItemsPageState extends ConsumerState<DueItemsPage> {
                     final hasPending = dayItems.any((item) => item.isPending && !item.isOverdue);
                     final hasPaid = dayItems.any((item) => item.isPaid);
 
+                    final isToday = date.day == DateTime.now().day &&
+                        _selectedMonth.month == DateTime.now().month &&
+                        _selectedMonth.year == DateTime.now().year;
+
                     return Expanded(
                       child: Padding(
                         padding: const EdgeInsets.all(2),
                         child: Container(
                           height: 50,
                           decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.shade300),
-                            borderRadius: BorderRadius.circular(8),
-                            color: date.day == DateTime.now().day &&
-                                    _selectedMonth.month == DateTime.now().month &&
-                                    _selectedMonth.year == DateTime.now().year
-                                ? Theme.of(context).colorScheme.primaryContainer
+                            border: Border.all(
+                              color: AppColors.border,
+                              width: 1,
+                            ),
+                            borderRadius: BorderRadius.circular(AppBorders.smallRadius),
+                            color: isToday
+                                ? AppColors.primary.withOpacity(0.1)
                                 : null,
                           ),
                           child: Column(
@@ -587,13 +664,9 @@ class _DueItemsPageState extends ConsumerState<DueItemsPage> {
                             children: [
                               Text(
                                 '$dayNumber',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: date.day == DateTime.now().day &&
-                                          _selectedMonth.month == DateTime.now().month &&
-                                          _selectedMonth.year == DateTime.now().year
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
+                                style: AppTypography.bodySmall.copyWith(
+                                  fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
+                                  color: isToday ? AppColors.primary : AppColors.textDark,
                                 ),
                               ),
                               const SizedBox(height: 2),
@@ -605,25 +678,25 @@ class _DueItemsPageState extends ConsumerState<DueItemsPage> {
                                       width: 6,
                                       height: 6,
                                       decoration: const BoxDecoration(
-                                        color: Colors.red,
+                                        color: AppColors.error,
                                         shape: BoxShape.circle,
                                       ),
                                     ),
-                                  if (hasPending)
+                                  if (hasPending && !hasOverdue)
                                     Container(
                                       width: 6,
                                       height: 6,
                                       decoration: const BoxDecoration(
-                                        color: Colors.orange,
+                                        color: AppColors.warning,
                                         shape: BoxShape.circle,
                                       ),
                                     ),
-                                  if (hasPaid)
+                                  if (hasPaid && !hasOverdue && !hasPending)
                                     Container(
                                       width: 6,
                                       height: 6,
                                       decoration: const BoxDecoration(
-                                        color: Colors.green,
+                                        color: AppColors.success,
                                         shape: BoxShape.circle,
                                       ),
                                     ),
@@ -644,83 +717,262 @@ class _DueItemsPageState extends ConsumerState<DueItemsPage> {
     );
   }
 
-  Widget _buildDueItemCard(DueItem item, bool canEdit, Color sectionColor) {
+  /// Cards de resumo no topo
+  Widget _buildSummaryCards(double totalOverdue, double totalToPay, double totalToReceive) {
+    final isMobile = ResponsiveUtils.isMobile(context);
+    
+    if (isMobile) {
+      return Column(
+        children: [
+          _buildSummaryCard(
+            'Total Vencido',
+            totalOverdue,
+            AppColors.error,
+            Icons.warning,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _buildSummaryCard(
+            'A Pagar',
+            totalToPay,
+            AppColors.expense,
+            Icons.arrow_upward,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _buildSummaryCard(
+            'A Receber',
+            totalToReceive,
+            AppColors.income,
+            Icons.arrow_downward,
+          ),
+        ],
+      );
+    } else {
+      return Row(
+        children: [
+          Expanded(
+            child: _buildSummaryCard(
+              'Total Vencido',
+              totalOverdue,
+              AppColors.error,
+              Icons.warning,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: _buildSummaryCard(
+              'A Pagar',
+              totalToPay,
+              AppColors.expense,
+              Icons.arrow_upward,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: _buildSummaryCard(
+              'A Receber',
+              totalToReceive,
+              AppColors.income,
+              Icons.arrow_downward,
+            ),
+          ),
+        ],
+      );
+    }
+  }
+
+  Widget _buildSummaryCard(String label, double value, Color color, IconData icon) {
+    return AccessibleCard(
+      child: Padding(
+        padding: EdgeInsets.all(AppSpacing.md),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(AppBorders.smallRadius),
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs / 2),
+                  Text(
+                    _formatCurrency(value, 'BRL'),
+                    style: AppTypography.kpiValue.copyWith(
+                      fontSize: 20,
+                      color: color,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDueItemCard(DueItem item, bool canEdit) {
     final daysUntilDue = item.dueDate.difference(DateTime.now()).inDays;
     final isPastDue = daysUntilDue < 0;
+    final isOverdue = item.isOverdue || item.isOverdueStatus;
+    final isPending = item.isPending && !isOverdue;
+    final isPaid = item.isPaid;
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: sectionColor.withOpacity(0.2),
-          child: Icon(
-            item.isPay ? Icons.arrow_upward : Icons.arrow_downward,
-            color: sectionColor,
-          ),
-        ),
-        title: Text(
-          item.title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Wrap(
-              spacing: 8,
-              children: [
-                Chip(
-                  label: Text(
-                    item.isPay ? 'A Pagar' : 'A Receber',
-                    style: const TextStyle(fontSize: 11),
-                  ),
-                  backgroundColor: item.isPay ? Colors.red.shade50 : Colors.green.shade50,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                Text(
-                  DateFormat('dd/MM/yyyy').format(item.dueDate),
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                if (isPastDue)
-                  Chip(
-                    label: Text(
-                      '${-daysUntilDue} dias atrasado',
-                      style: const TextStyle(fontSize: 11, color: Colors.white),
+    Color statusColor;
+    if (isOverdue) {
+      statusColor = AppColors.error;
+    } else if (isPending) {
+      statusColor = AppColors.warning;
+    } else {
+      statusColor = AppColors.success;
+    }
+
+    return AccessibleCard(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppBorders.cardRadius),
+          onTap: () {
+            // TODO: Navegar para detalhes do vencimento
+          },
+          child: Container(
+            decoration: isOverdue
+                ? BoxDecoration(
+                    borderRadius: BorderRadius.circular(AppBorders.cardRadius),
+                    border: Border.all(
+                      color: AppColors.error.withOpacity(0.3),
+                      width: 2,
                     ),
-                    backgroundColor: Colors.red,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    color: AppColors.error.withOpacity(0.05),
+                  )
+                : null,
+            padding: EdgeInsets.all(AppSpacing.md),
+            child: Row(
+              children: [
+                // Ícone
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(AppBorders.smallRadius),
                   ),
+                  child: Icon(
+                    item.isPay ? Icons.arrow_upward : Icons.arrow_downward,
+                    color: statusColor,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                // Conteúdo
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.title,
+                        style: AppTypography.cardTitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: AppSpacing.xs / 2),
+                      Wrap(
+                        spacing: AppSpacing.sm,
+                        runSpacing: AppSpacing.xs / 2,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.xs,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: (item.isPay ? AppColors.expense : AppColors.income)
+                                  .withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(AppBorders.smallRadius),
+                            ),
+                            child: Text(
+                              item.isPay ? 'A Pagar' : 'A Receber',
+                              style: AppTypography.caption.copyWith(
+                                color: item.isPay ? AppColors.expense : AppColors.income,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            DateFormat('dd/MM/yyyy').format(item.dueDate),
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          if (isPastDue)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.xs,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.error,
+                                borderRadius: BorderRadius.circular(AppBorders.smallRadius),
+                              ),
+                              child: Text(
+                                '${-daysUntilDue} dias atrasado',
+                                style: AppTypography.caption.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                // Valor e ações
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      _formatCurrency(item.amount, 'BRL'),
+                      style: AppTypography.bodyLarge.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: item.isPay ? AppColors.expense : AppColors.income,
+                      ),
+                    ),
+                    if (canEdit && item.isPending) ...[
+                      const SizedBox(height: AppSpacing.xs),
+                      TextButton.icon(
+                        icon: const Icon(Icons.check_circle, size: 16),
+                        label: Text(
+                          'Pago',
+                          style: AppTypography.labelSmall,
+                        ),
+                        onPressed: () => _markAsPaid(item),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.success,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.xs,
+                            vertical: 4,
+                          ),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ],
             ),
-          ],
-        ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              _formatCurrency(item.amount, 'BRL'),
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: item.isPay ? Colors.red : Colors.green,
-              ),
-            ),
-            if (canEdit && item.isPending)
-              TextButton.icon(
-                icon: const Icon(Icons.check_circle, size: 16),
-                label: const Text('Pago'),
-                onPressed: () => _markAsPaid(item),
-                style: TextButton.styleFrom(
-                  foregroundColor: Colors.green,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              ),
-          ],
+          ),
         ),
       ),
     );

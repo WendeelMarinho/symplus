@@ -319,47 +319,71 @@ class _QuarterlySummaryState extends ConsumerState<QuarterlySummary> {
                 ],
               )
             else
-              // Desktop/Tablet: grid 2x2 ou tabela
-              GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                childAspectRatio: 2.5,
+              // Desktop/Tablet: grid 2x2 usando Row/Column para evitar problemas de constraints
+              Column(
                 children: [
-                  _buildQuarterlyCard(
-                    context,
-                    context.t('dashboard.quarterly_summary.income'),
-                    _data!.income,
-                    Colors.green,
-                    Icons.trending_up,
-                    currencyState: currencyState,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 8, bottom: 16),
+                          child: _buildQuarterlyCard(
+                            context,
+                            context.t('dashboard.quarterly_summary.income'),
+                            _data!.income,
+                            Colors.green,
+                            Icons.trending_up,
+                            currencyState: currencyState,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 8, bottom: 16),
+                          child: _buildQuarterlyCard(
+                            context,
+                            context.t('dashboard.quarterly_summary.expense'),
+                            _data!.expenses,
+                            Colors.red,
+                            Icons.trending_down,
+                            currencyState: currencyState,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  _buildQuarterlyCard(
-                    context,
-                    context.t('dashboard.quarterly_summary.expense'),
-                    _data!.expenses,
-                    Colors.red,
-                    Icons.trending_down,
-                    currencyState: currencyState,
-                  ),
-                  _buildQuarterlyCard(
-                    context,
-                    context.t('dashboard.quarterly_summary.net'),
-                    _data!.net,
-                    _data!.net >= 0 ? Colors.blue : Colors.red,
-                    Icons.account_balance,
-                    currencyState: currencyState,
-                  ),
-                  _buildQuarterlyCard(
-                    context,
-                    context.t('dashboard.quarterly_summary.percentage'),
-                    _data!.percentage,
-                    Colors.amber,
-                    Icons.percent,
-                    isPercentage: true,
-                    currencyState: currencyState,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: _buildQuarterlyCard(
+                            context,
+                            context.t('dashboard.quarterly_summary.net'),
+                            _data!.net,
+                            _data!.net >= 0 ? Colors.blue : Colors.red,
+                            Icons.account_balance,
+                            currencyState: currencyState,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: _buildQuarterlyCard(
+                            context,
+                            context.t('dashboard.quarterly_summary.percentage'),
+                            _data!.percentage,
+                            Colors.amber,
+                            Icons.percent,
+                            isPercentage: true,
+                            currencyState: currencyState,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

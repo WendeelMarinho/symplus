@@ -10,10 +10,18 @@ import '../../../../core/widgets/file_image_helper.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/widgets/page_header.dart';
 import '../../../../core/widgets/toast_service.dart';
+import '../../../../core/widgets/confirm_dialog.dart';
 import '../../../../core/auth/auth_provider.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/storage/storage_service.dart';
 import '../../../../config/api_config.dart';
+import '../../../../core/accessibility/responsive_utils.dart';
+import '../../../../core/design/app_colors.dart';
+import '../../../../core/design/app_typography.dart';
+import '../../../../core/design/app_spacing.dart';
+import '../../../../core/design/app_borders.dart';
+import '../../../../core/design/app_shadows.dart';
+import '../../../../core/accessibility/accessible_widgets.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
@@ -144,18 +152,18 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     return Stack(
       children: [
         CircleAvatar(
-          radius: 50,
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          radius: 60,
+          backgroundColor: AppColors.primary.withOpacity(0.1),
           backgroundImage: backgroundImage,
           child: _avatarUrl == null
               ? Text(
                   (_nameController.text.isNotEmpty
                       ? _nameController.text[0].toUpperCase()
                       : 'U'),
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  style: AppTypography.displaySmall.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
                 )
               : null,
         ),
@@ -176,12 +184,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           right: 0,
           child: Container(
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary,
+              color: AppColors.primary,
               shape: BoxShape.circle,
               border: Border.all(
-                color: Theme.of(context).colorScheme.surface,
-                width: 2,
+                color: AppColors.surfaceLight,
+                width: 3,
               ),
+              boxShadow: [AppShadows.button],
             ),
             child: IconButton(
               icon: const Icon(Icons.camera_alt, size: 20, color: Colors.white),
@@ -189,6 +198,45 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               tooltip: 'Alterar foto',
             ),
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPreferenceItem({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Widget child,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, color: AppColors.textSecondary, size: 20),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: AppTypography.bodyMedium.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs / 2),
+              Text(
+                subtitle,
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        SizedBox(
+          width: 150,
+          child: child,
         ),
       ],
     );
@@ -236,128 +284,280 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Row(
-            children: [
-              Icon(Icons.lock_reset, color: Theme.of(context).colorScheme.primary),
-              const SizedBox(width: 12),
-              const Text('Alterar Senha'),
-            ],
+        builder: (context, setDialogState) => Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
           ),
-          content: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Para sua segurança, confirme sua senha atual e defina uma nova senha.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: 500,
+              maxHeight: 700,
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Header
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withOpacity(0.1),
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(20),
+                          topRight: Radius.circular(20),
                         ),
-                  ),
-                  const SizedBox(height: 20),
-                  TextFormField(
-                    controller: oldPasswordController,
-                    decoration: const InputDecoration(
-                      labelText: 'Senha Atual *',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.lock_outline),
-                      helperText: 'Digite sua senha atual',
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.warning,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.lock_reset,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Alterar Senha',
+                                  style: AppTypography.headlineSmall.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.onSurface,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Para sua segurança, confirme sua senha atual e defina uma nova senha.',
+                                  style: AppTypography.bodyMedium.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: isLoading
+                                ? null
+                                : () {
+                                    oldPasswordController.dispose();
+                                    newPasswordController.dispose();
+                                    confirmPasswordController.dispose();
+                                    Navigator.of(context).pop(false);
+                                  },
+                            color: AppColors.textSecondary,
+                          ),
+                        ],
+                      ),
                     ),
-                    obscureText: true,
-                    validator: (value) =>
-                        value?.isEmpty ?? true ? 'Senha atual é obrigatória' : null,
-                    autofocus: true,
-                    enabled: !isLoading,
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: newPasswordController,
-                    decoration: const InputDecoration(
-                      labelText: 'Nova Senha *',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.lock),
-                      helperText: 'Mínimo de 8 caracteres',
+                    // Conteúdo com scroll
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            TextFormField(
+                              controller: oldPasswordController,
+                              decoration: InputDecoration(
+                                labelText: 'Senha Atual *',
+                                filled: true,
+                                fillColor: AppColors.background,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.border),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.border),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.primary, width: 2),
+                                ),
+                                prefixIcon: Icon(Icons.lock_outline, color: AppColors.primary),
+                                helperText: 'Digite sua senha atual',
+                                helperStyle: AppTypography.caption,
+                              ),
+                              style: AppTypography.bodyMedium,
+                              obscureText: true,
+                              validator: (value) =>
+                                  value?.isEmpty ?? true ? 'Senha atual é obrigatória' : null,
+                              autofocus: true,
+                              enabled: !isLoading,
+                            ),
+                            const SizedBox(height: 20),
+                            TextFormField(
+                              controller: newPasswordController,
+                              decoration: InputDecoration(
+                                labelText: 'Nova Senha *',
+                                filled: true,
+                                fillColor: AppColors.background,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.border),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.border),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.primary, width: 2),
+                                ),
+                                prefixIcon: Icon(Icons.lock, color: AppColors.primary),
+                                helperText: 'Mínimo de 8 caracteres',
+                                helperStyle: AppTypography.caption,
+                              ),
+                              style: AppTypography.bodyMedium,
+                              obscureText: true,
+                              enabled: !isLoading,
+                              validator: (value) {
+                                if (value?.isEmpty ?? true) return 'Nova senha é obrigatória';
+                                if ((value?.length ?? 0) < 8) return 'Senha deve ter no mínimo 8 caracteres';
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 20),
+                            TextFormField(
+                              controller: confirmPasswordController,
+                              decoration: InputDecoration(
+                                labelText: 'Confirmar Nova Senha *',
+                                filled: true,
+                                fillColor: AppColors.background,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.border),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.border),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: AppColors.primary, width: 2),
+                                ),
+                                prefixIcon: Icon(Icons.lock, color: AppColors.primary),
+                              ),
+                              style: AppTypography.bodyMedium,
+                              obscureText: true,
+                              enabled: !isLoading,
+                              validator: (value) {
+                                if (value != newPasswordController.text) {
+                                  return 'Senhas não coincidem';
+                                }
+                                return null;
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                    obscureText: true,
-                    enabled: !isLoading,
-                    validator: (value) {
-                      if (value?.isEmpty ?? true) return 'Nova senha é obrigatória';
-                      if ((value?.length ?? 0) < 8) return 'Senha deve ter no mínimo 8 caracteres';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: confirmPasswordController,
-                    decoration: const InputDecoration(
-                      labelText: 'Confirmar Nova Senha *',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.lock),
+                    // Botões
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          top: BorderSide(color: AppColors.border, width: 1),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: isLoading
+                                ? null
+                                : () {
+                                    oldPasswordController.dispose();
+                                    newPasswordController.dispose();
+                                    confirmPasswordController.dispose();
+                                    Navigator.of(context).pop(false);
+                                  },
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            ),
+                            child: Text(
+                              'Cancelar',
+                              style: AppTypography.labelLarge.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          FilledButton(
+                            onPressed: isLoading
+                                ? null
+                                : () async {
+                                    if (formKey.currentState!.validate()) {
+                                      setDialogState(() {
+                                        isLoading = true;
+                                      });
+
+                                      try {
+                                        // TODO: Implementar quando houver endpoint POST /api/me/change-password
+                                        await Future.delayed(const Duration(seconds: 1));
+                                        
+                                        if (context.mounted) {
+                                          Navigator.of(context).pop(true);
+                                          ToastService.showSuccess(context, 'Senha alterada com sucesso!');
+                                        }
+                                      } catch (e) {
+                                        setDialogState(() {
+                                          isLoading = false;
+                                        });
+                                        if (context.mounted) {
+                                          ToastService.showError(context, 'Erro ao alterar senha: ${e.toString()}');
+                                        }
+                                      }
+                                    }
+                                  },
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.warning,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: isLoading
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    ),
+                                  )
+                                : Text(
+                                    'Alterar Senha',
+                                    style: AppTypography.labelLarge.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                          ),
+                        ],
+                      ),
                     ),
-                    obscureText: true,
-                    enabled: !isLoading,
-                    validator: (value) {
-                      if (value != newPasswordController.text) {
-                        return 'Senhas não coincidem';
-                      }
-                      return null;
-                    },
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: isLoading
-                  ? null
-                  : () {
-                      oldPasswordController.dispose();
-                      newPasswordController.dispose();
-                      confirmPasswordController.dispose();
-                      Navigator.of(context).pop(false);
-                    },
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: isLoading
-                  ? null
-                  : () async {
-                      if (formKey.currentState!.validate()) {
-                        setDialogState(() {
-                          isLoading = true;
-                        });
-
-                        try {
-                          // TODO: Implementar quando houver endpoint POST /api/me/change-password
-                          await Future.delayed(const Duration(seconds: 1));
-                          
-                          if (context.mounted) {
-                            Navigator.of(context).pop(true);
-                            ToastService.showSuccess(context, 'Senha alterada com sucesso!');
-                          }
-                        } catch (e) {
-                          setDialogState(() {
-                            isLoading = false;
-                          });
-                          if (context.mounted) {
-                            ToastService.showError(context, 'Erro ao alterar senha: ${e.toString()}');
-                          }
-                        }
-                      }
-                    },
-              child: isLoading
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Alterar Senha'),
-            ),
-          ],
         ),
       ),
     );
@@ -370,25 +570,17 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 
   Future<void> _logout() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirmar Logout'),
-        content: const Text('Deseja realmente sair?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Sair'),
-          ),
-        ],
-      ),
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: 'Confirmar Logout',
+      message: 'Deseja realmente sair?',
+      confirmLabel: 'Sair',
+      cancelLabel: 'Cancelar',
+      icon: Icons.logout,
+      isDestructive: false,
     );
 
-    if (confirmed == true) {
+    if (confirmed) {
       try {
         await DioClient.post(ApiConfig.logout);
       } catch (e) {
@@ -416,277 +608,379 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         PageHeader(
           title: 'Perfil',
           subtitle: 'Gerencie suas informações pessoais e preferências',
-          breadcrumbs: const ['Conta', 'Perfil'],
         ),
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(AppSpacing.pagePadding(context).horizontal),
             child: Form(
               key: _formKey,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Card de Avatar e Informações Pessoais
-                  Card(
-                    elevation: 3,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
+                  AccessibleCard(
                     child: Padding(
-                      padding: const EdgeInsets.all(20),
+                      padding: EdgeInsets.all(AppSpacing.lg),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
-                              Icon(
-                                Icons.person,
-                                color: Theme.of(context).colorScheme.primary,
-                                size: 28,
+                              Container(
+                                padding: const EdgeInsets.all(AppSpacing.sm),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(AppBorders.smallRadius),
+                                ),
+                                child: Icon(
+                                  Icons.person,
+                                  color: AppColors.primary,
+                                  size: 24,
+                                ),
                               ),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: AppSpacing.sm),
                               Text(
                                 'Informações Pessoais',
-                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                style: AppTypography.sectionTitle,
                               ),
                             ],
                           ),
-                          const SizedBox(height: 24),
+                          const SizedBox(height: AppSpacing.xl),
                           // Avatar
                           Center(
                             child: _buildAvatar(),
                           ),
-                          const SizedBox(height: 24),
+                          const SizedBox(height: AppSpacing.xl),
                           TextFormField(
                             controller: _nameController,
-                            decoration: const InputDecoration(
-                              labelText: 'Nome',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.person_outline),
+                            decoration: InputDecoration(
+                              labelText: 'Nome *',
+                              filled: true,
+                              fillColor: AppColors.background,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: AppColors.border),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: AppColors.border),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: AppColors.primary, width: 2),
+                              ),
+                              prefixIcon: Icon(Icons.person_outline, color: AppColors.primary),
                             ),
+                            style: AppTypography.bodyMedium,
                             validator: (value) =>
                                 value?.isEmpty ?? true ? 'Nome é obrigatório' : null,
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 20),
                           TextFormField(
                             controller: _emailController,
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               labelText: 'E-mail',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.email_outlined),
+                              filled: true,
+                              fillColor: AppColors.background.withOpacity(0.5),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: AppColors.border),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: AppColors.border),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: AppColors.primary, width: 2),
+                              ),
+                              prefixIcon: Icon(Icons.email_outlined, color: AppColors.textSecondary),
                             ),
+                            style: AppTypography.bodyMedium,
                             enabled: false, // Email não pode ser alterado
                             validator: (value) =>
                                 value?.isEmpty ?? true ? 'E-mail é obrigatório' : null,
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 20),
                           TextFormField(
                             initialValue: authState.role == 'owner'
                                 ? 'Proprietário'
                                 : authState.role == 'admin'
                                     ? 'Administrador'
                                     : 'Usuário',
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               labelText: 'Papel',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.badge_outlined),
+                              filled: true,
+                              fillColor: AppColors.background.withOpacity(0.5),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: AppColors.border),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: AppColors.border),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: AppColors.primary, width: 2),
+                              ),
+                              prefixIcon: Icon(Icons.badge_outlined, color: AppColors.textSecondary),
                             ),
+                            style: AppTypography.bodyMedium,
                             enabled: false,
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: AppSpacing.lg),
                           SizedBox(
                             width: double.infinity,
-                            child: FilledButton.icon(
-                              onPressed: _isLoading ? null : _updateProfile,
-                              icon: _isLoading
-                                  ? const SizedBox(
+                            child: _isLoading
+                                ? FilledButton.icon(
+                                    onPressed: null,
+                                    icon: const SizedBox(
                                       width: 16,
                                       height: 16,
                                       child: CircularProgressIndicator(strokeWidth: 2),
-                                    )
-                                  : const Icon(Icons.save),
-                              label: const Text('Salvar Alterações'),
-                            ),
+                                    ),
+                                    label: const Text('Salvando...'),
+                                  )
+                                : AccessibleFilledButton.icon(
+                                    onPressed: _updateProfile,
+                                    icon: Icons.save,
+                                    label: 'Salvar Alterações',
+                                  ),
                           ),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.md),
 
                   // Card de Preferências
-                  Card(
-                    elevation: 3,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
+                  AccessibleCard(
                     child: Padding(
-                      padding: const EdgeInsets.all(20),
+                      padding: EdgeInsets.all(AppSpacing.lg),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
-                              Icon(
-                                Icons.settings,
-                                color: Theme.of(context).colorScheme.primary,
-                                size: 28,
+                              Container(
+                                padding: const EdgeInsets.all(AppSpacing.sm),
+                                decoration: BoxDecoration(
+                                  color: AppColors.secondary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(AppBorders.smallRadius),
+                                ),
+                                child: Icon(
+                                  Icons.settings,
+                                  color: AppColors.secondary,
+                                  size: 24,
+                                ),
                               ),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: AppSpacing.sm),
                               Text(
                                 'Preferências',
-                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                style: AppTypography.sectionTitle,
                               ),
                             ],
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: AppSpacing.md),
                           // Tema
-                          ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: const Icon(Icons.palette),
-                            title: const Text('Tema'),
-                            subtitle: Text(_getThemeModeLabel(_themeMode)),
-                            trailing: DropdownButton<ThemeMode>(
-                              value: _themeMode,
-                              items: const [
-                                DropdownMenuItem(
-                                  value: ThemeMode.system,
-                                  child: Text('Sistema'),
+                          _buildPreferenceItem(
+                            icon: Icons.palette,
+                            title: 'Tema',
+                            subtitle: _getThemeModeLabel(_themeMode),
+                            child: SizedBox(
+                              width: 160,
+                              child: DropdownButtonFormField<ThemeMode>(
+                                value: _themeMode,
+                                decoration: InputDecoration(
+                                  filled: true,
+                                  fillColor: AppColors.background,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: AppColors.border),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: AppColors.border),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: AppColors.primary, width: 2),
+                                  ),
                                 ),
-                                DropdownMenuItem(
-                                  value: ThemeMode.light,
-                                  child: Text('Claro'),
-                                ),
-                                DropdownMenuItem(
-                                  value: ThemeMode.dark,
-                                  child: Text('Escuro'),
-                                ),
-                              ],
-                              onChanged: (value) {
-                                if (value != null) {
-                                  _saveThemeMode(value);
-                                }
-                              },
+                                style: AppTypography.bodyMedium,
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: ThemeMode.system,
+                                    child: Text('Sistema'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: ThemeMode.light,
+                                    child: Text('Claro'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: ThemeMode.dark,
+                                    child: Text('Escuro'),
+                                  ),
+                                ],
+                                onChanged: (value) {
+                                  if (value != null) {
+                                    _saveThemeMode(value);
+                                  }
+                                },
+                              ),
                             ),
                           ),
-                          const Divider(),
+                          const Divider(height: AppSpacing.xl),
                           // Idioma
-                          ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: const Icon(Icons.language),
-                            title: const Text('Idioma'),
-                            subtitle: Text(_getLanguageLabel(_language)),
-                            trailing: DropdownButton<String>(
-                              value: _language,
-                              items: const [
-                                DropdownMenuItem(
-                                  value: 'pt_BR',
-                                  child: Text('Português (BR)'),
+                          _buildPreferenceItem(
+                            icon: Icons.language,
+                            title: 'Idioma',
+                            subtitle: _getLanguageLabel(_language),
+                            child: SizedBox(
+                              width: 160,
+                              child: DropdownButtonFormField<String>(
+                                value: _language,
+                                decoration: InputDecoration(
+                                  filled: true,
+                                  fillColor: AppColors.background,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: AppColors.border),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: AppColors.border),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: AppColors.primary, width: 2),
+                                  ),
                                 ),
-                                DropdownMenuItem(
-                                  value: 'en_US',
-                                  child: Text('English (US)'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'es_ES',
-                                  child: Text('Español'),
-                                ),
-                              ],
-                              onChanged: (value) {
-                                if (value != null) {
-                                  _saveLanguage(value);
-                                }
-                              },
+                                style: AppTypography.bodyMedium,
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: 'pt_BR',
+                                    child: Text('Português (BR)'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'en_US',
+                                    child: Text('English (US)'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'es_ES',
+                                    child: Text('Español'),
+                                  ),
+                                ],
+                                onChanged: (value) {
+                                  if (value != null) {
+                                    _saveLanguage(value);
+                                  }
+                                },
+                              ),
                             ),
                           ),
-                          const Divider(),
+                          const Divider(height: AppSpacing.xl),
                           // Moeda
-                          ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: const Icon(Icons.attach_money),
-                            title: const Text('Moeda Padrão'),
-                            subtitle: Text(_getCurrencyLabel(_currency)),
-                            trailing: DropdownButton<String>(
-                              value: _currency,
-                              items: const [
-                                DropdownMenuItem(
-                                  value: 'BRL',
-                                  child: Text('BRL - Real'),
+                          _buildPreferenceItem(
+                            icon: Icons.attach_money,
+                            title: 'Moeda Padrão',
+                            subtitle: _getCurrencyLabel(_currency),
+                            child: SizedBox(
+                              width: 160,
+                              child: DropdownButtonFormField<String>(
+                                value: _currency,
+                                decoration: InputDecoration(
+                                  filled: true,
+                                  fillColor: AppColors.background,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: AppColors.border),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: AppColors.border),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: AppColors.primary, width: 2),
+                                  ),
                                 ),
-                                DropdownMenuItem(
-                                  value: 'USD',
-                                  child: Text('USD - Dólar'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'EUR',
-                                  child: Text('EUR - Euro'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'GBP',
-                                  child: Text('GBP - Libra'),
-                                ),
-                              ],
-                              onChanged: (value) {
-                                if (value != null) {
-                                  _saveCurrency(value);
-                                }
-                              },
+                                style: AppTypography.bodyMedium,
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: 'BRL',
+                                    child: Text('BRL - Real'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'USD',
+                                    child: Text('USD - Dólar'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'EUR',
+                                    child: Text('EUR - Euro'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'GBP',
+                                    child: Text('GBP - Libra'),
+                                  ),
+                                ],
+                                onChanged: (value) {
+                                  if (value != null) {
+                                    _saveCurrency(value);
+                                  }
+                                },
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.md),
 
                   // Card de Segurança
-                  Card(
-                    elevation: 3,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
+                  AccessibleCard(
                     child: Padding(
-                      padding: const EdgeInsets.all(20),
+                      padding: EdgeInsets.all(AppSpacing.lg),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
-                              Icon(
-                                Icons.lock,
-                                color: Theme.of(context).colorScheme.primary,
-                                size: 28,
+                              Container(
+                                padding: const EdgeInsets.all(AppSpacing.sm),
+                                decoration: BoxDecoration(
+                                  color: AppColors.warning.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(AppBorders.smallRadius),
+                                ),
+                                child: Icon(
+                                  Icons.lock,
+                                  color: AppColors.warning,
+                                  size: 24,
+                                ),
                               ),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: AppSpacing.sm),
                               Text(
                                 'Segurança',
-                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                style: AppTypography.sectionTitle,
                               ),
                             ],
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: AppSpacing.md),
                           SizedBox(
                             width: double.infinity,
-                            child: FilledButton.icon(
+                            child: AccessibleFilledButton.icon(
                               onPressed: _changePassword,
-                              icon: const Icon(Icons.lock_reset),
-                              label: const Text('Alterar Senha'),
-                              style: FilledButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                              ),
+                              icon: Icons.lock_reset,
+                              label: 'Alterar Senha',
                             ),
                           ),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.md),
 
                   // Botão de Logout
                   SizedBox(
@@ -696,8 +990,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                       icon: const Icon(Icons.logout),
                       label: const Text('Sair'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Theme.of(context).colorScheme.error,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        foregroundColor: AppColors.error,
+                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
                       ),
                     ),
                   ),
