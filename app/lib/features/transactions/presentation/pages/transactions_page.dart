@@ -319,9 +319,9 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  // Upload de documento (obrigatório)
+                  // Upload de documento (opcional)
                   TransactionDocumentUpload(
-                    required: true,
+                    required: false,
                     onFileSelected: (file) {
                       selectedFile = file;
                       setDialogState(() {});
@@ -348,8 +348,7 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
               onPressed: () async {
                 if (formKey.currentState!.validate() &&
                     selectedAccountId != null &&
-                    selectedDate != null &&
-                    selectedFile != null) {
+                    selectedDate != null) {
                   // Salvar valores antes de fechar
                   final accountId = selectedAccountId!;
                   final categoryId = selectedCategoryId;
@@ -357,34 +356,31 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                   final amount = double.parse(amountController.text.replaceAll(',', '.'));
                   final occurredAt = selectedDate!;
                   final description = descriptionController.text;
-                  final file = selectedFile!;
+                  final file = selectedFile;
                   
-                  // Fechar diálogo primeiro
+                  // Fechar diálogo primeiro (usando contexto do diálogo)
                   Navigator.of(context).pop();
+                  
+                  // Aguardar um frame para garantir que o diálogo foi fechado
+                  await Future.delayed(const Duration(milliseconds: 100));
+                  
                   // Dispose controllers após fechar
-                  Future.microtask(() {
-                    descriptionController.dispose();
-                    amountController.dispose();
-                    typeController.dispose();
-                  });
-                  // Criar transação com valores salvos
-                  await _createTransaction(
-                    accountId: accountId,
-                    categoryId: categoryId,
-                    type: type,
-                    amount: amount,
-                    occurredAt: occurredAt,
-                    description: description,
-                    file: file,
-                  );
-                } else if (selectedFile == null) {
-                  // Mostrar erro se arquivo não foi selecionado
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Por favor, selecione um documento'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
+                  descriptionController.dispose();
+                  amountController.dispose();
+                  typeController.dispose();
+                  
+                  // Criar transação com valores salvos (usando contexto do widget pai)
+                  if (mounted) {
+                    await _createTransaction(
+                      accountId: accountId,
+                      categoryId: categoryId,
+                      type: type,
+                      amount: amount,
+                      occurredAt: occurredAt,
+                      description: description,
+                      file: file,
+                    );
+                  }
                 }
               },
               child: const Text('Criar'),
@@ -402,26 +398,32 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
     required double amount,
     required DateTime occurredAt,
     required String description,
-    required PlatformFile file,
+    PlatformFile? file,
   }) async {
     try {
-      // Primeiro, fazer upload do documento
-      final uploadResponse = await DocumentService.upload(
-        file: file,
-        name: file.name,
-        description: 'Documento da transação: $description',
-        category: 'transaction',
-        documentableType: 'transaction',
-      );
+      String? documentPath;
+      int? documentId;
 
-      if (uploadResponse.statusCode != 201) {
-        throw Exception('Erro ao fazer upload do documento');
+      // Fazer upload do documento apenas se houver arquivo selecionado
+      if (file != null) {
+        final uploadResponse = await DocumentService.upload(
+          file: file,
+          name: file.name,
+          description: 'Documento da transação: $description',
+          category: 'transaction',
+          documentableType: 'transaction',
+        );
+
+        if (uploadResponse.statusCode != 201) {
+          throw Exception('Erro ao fazer upload do documento');
+        }
+
+        final documentData = uploadResponse.data['data'] as Map<String, dynamic>;
+        documentPath = documentData['path'] as String?;
+        documentId = documentData['id'] as int;
       }
 
-      final documentData = uploadResponse.data['data'] as Map<String, dynamic>;
-      final documentPath = documentData['path'] as String?;
-
-      // Criar transação com o path do documento
+      // Criar transação com o path do documento (se houver)
       final transactionResponse = await TransactionService.create(
         accountId: accountId,
         categoryId: categoryId,
@@ -432,11 +434,10 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
         attachmentPath: documentPath,
       );
 
-      // Associar documento à transação após criação
-      if (transactionResponse.statusCode == 201) {
+      // Associar documento à transação após criação (se houver documento)
+      if (file != null && documentId != null && transactionResponse.statusCode == 201) {
         final transactionData = transactionResponse.data['data'] as Map<String, dynamic>;
         final transactionId = transactionData['id'] as int;
-        final documentId = documentData['id'] as int;
 
         // Atualizar documento para associar à transação
         await DocumentService.update(

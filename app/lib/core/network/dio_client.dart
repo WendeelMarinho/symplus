@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 import '../../config/api_config.dart';
 import '../storage/storage_service.dart';
+import '../auth/auth_session_handler.dart';
 
 class DioClient {
   static Dio? _dio;
@@ -42,11 +43,11 @@ class DioClient {
 
           return handler.next(options);
         },
-        onError: (error, handler) {
+        onError: (error, handler) async {
           // Tratar erros 401 (não autenticado)
           if (error.response?.statusCode == 401) {
-            // Limpar storage e redirecionar para login
-            StorageService.clearAll();
+            // Tratar expiração de token
+            await AuthSessionHandler.handleTokenExpired();
           }
           return handler.next(error);
         },

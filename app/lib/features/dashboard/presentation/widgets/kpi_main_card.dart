@@ -6,6 +6,7 @@ import '../../../../core/accessibility/telemetry_service.dart';
 import '../../../../core/providers/currency_provider.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/l10n/app_localizations.dart';
+import '../../data/models/dashboard_layout.dart';
 
 /// Tipo de KPI principal
 enum KpiType {
@@ -25,6 +26,7 @@ class KpiMainCard extends ConsumerWidget {
   final double? previousValue;
   final String? label;
   final VoidCallback? onDetailsTap;
+  final DashboardInsight? insight;
 
   const KpiMainCard({
     super.key,
@@ -33,6 +35,7 @@ class KpiMainCard extends ConsumerWidget {
     this.previousValue,
     this.label,
     this.onDetailsTap,
+    this.insight,
   });
 
   /// Retorna a configuração visual baseada no tipo
@@ -71,6 +74,50 @@ class KpiMainCard extends ConsumerWidget {
 
   String _formatPercentage(double value) {
     return '${value.toStringAsFixed(1)}%';
+  }
+
+  String _getWidgetId() {
+    switch (type) {
+      case KpiType.income:
+        return 'kpi_income';
+      case KpiType.expense:
+        return 'kpi_expense';
+      case KpiType.net:
+        return 'kpi_net';
+      case KpiType.percentage:
+        return 'kpi_percentage';
+    }
+  }
+
+  Color _getInsightColor(String type) {
+    switch (type) {
+      case 'success':
+        return Colors.green;
+      case 'warning':
+        return Colors.orange;
+      case 'error':
+        return Colors.red;
+      default:
+        return Colors.blue;
+    }
+  }
+
+  IconData _getInsightIcon(String? iconName) {
+    if (iconName == null) return Icons.info_outline;
+    switch (iconName) {
+      case 'trending_up':
+        return Icons.trending_up;
+      case 'trending_down':
+        return Icons.trending_down;
+      case 'warning':
+        return Icons.warning;
+      case 'check_circle':
+        return Icons.check_circle;
+      case 'error':
+        return Icons.error;
+      default:
+        return Icons.info_outline;
+    }
   }
 
   double? _getVariation() {
@@ -125,15 +172,15 @@ class KpiMainCard extends ConsumerWidget {
       button: true,
       onTap: () => _handleDetailsTap(context),
       child: Card(
-        elevation: 3,
+        elevation: 2,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: config.color.withOpacity(0.3),
+              color: config.color.withOpacity(0.2),
               width: 1,
             ),
           ),
@@ -141,68 +188,109 @@ class KpiMainCard extends ConsumerWidget {
             borderRadius: BorderRadius.circular(16),
             onTap: () => _handleDetailsTap(context),
             child: Padding(
-              padding: EdgeInsets.all(isMobile ? 16 : 20),
+              padding: EdgeInsets.all(isMobile ? 12 : 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   // Cabeçalho com ícone e título
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(10),
+                            padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(
                               color: config.color.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(8),
                             ),
                             child: Icon(
                               config.icon,
                               color: config.color,
-                              size: 24,
+                              size: 16,
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 8),
+                          // Removido Flexible - usar Text diretamente com overflow
                           Text(
                             label ?? config.title,
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
                                   fontWeight: FontWeight.w600,
+                                  fontSize: 13,
                                   color: Theme.of(context).colorScheme.onSurface,
                                 ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
                         ],
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // Valor principal
+                  Text(
+                    formattedValue,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: config.color,
+                          fontSize: isMobile ? 20 : 22,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  // Linha com mês anterior e variação - usar Wrap em vez de Row com Expanded
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      // Mês anterior
+                      if (previousValue != null)
+                        Text(
+                          previousLabel!,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                fontSize: 11,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurface
+                                    .withOpacity(0.6),
+                              ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      // Variação percentual
                       if (variation != null)
                         Tooltip(
                           message: variationLabel ?? '',
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
+                              horizontal: 6,
+                              vertical: 2,
                             ),
                             decoration: BoxDecoration(
                               color: isPositive
                                   ? Colors.green.withOpacity(0.1)
                                   : Colors.red.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(6),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
                                   isPositive ? Icons.trending_up : Icons.trending_down,
-                                  size: 14,
-                                  color: isPositive ? Colors.green : Colors.red,
+                                  size: 12,
+                                  color: isPositive ? Colors.green.shade700 : Colors.red.shade700,
                                 ),
-                                const SizedBox(width: 4),
+                                const SizedBox(width: 2),
                                 Text(
                                   '${variation!.abs().toStringAsFixed(1)}%',
                                   style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: isPositive ? Colors.green : Colors.red,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: isPositive ? Colors.green.shade700 : Colors.red.shade700,
                                   ),
                                 ),
                               ],
@@ -211,42 +299,64 @@ class KpiMainCard extends ConsumerWidget {
                         ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  // Valor principal
-                  Text(
-                    formattedValue,
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: config.color,
-                          fontSize: isMobile ? 28 : 32,
+                  // Insight (se disponível)
+                  if (insight != null && insight!.widgetId == _getWidgetId()) ...[
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: _getInsightColor(insight!.type).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: _getInsightColor(insight!.type).withOpacity(0.3),
+                          width: 1,
                         ),
-                  ),
-                  const SizedBox(height: 8),
-                  // Comparativo com mês anterior
-                  if (previousValue != null)
-                    Text(
-                      previousLabel!,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withOpacity(0.6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _getInsightIcon(insight!.icon),
+                            size: 14,
+                            color: _getInsightColor(insight!.type),
                           ),
+                          const SizedBox(width: 6),
+                          // Removido Expanded - usar Flexible com fit loose ou Text diretamente
+                          Flexible(
+                            fit: FlexFit.loose,
+                            child: Text(
+                              insight!.message,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: _getInsightColor(insight!.type),
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  const Spacer(),
-                  // Botão [Detalhes]
+                  ],
+                  const SizedBox(height: 8),
+                  // Botão [Detalhes] mais compacto
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
                       onPressed: () => _handleDetailsTap(context),
-                      icon: const Icon(Icons.arrow_forward, size: 18),
-                      label: Text(context.t('common.details')),
+                      icon: const Icon(Icons.arrow_forward, size: 16),
+                      label: Text(
+                        context.t('common.details'),
+                        style: const TextStyle(fontSize: 12),
+                      ),
                       style: FilledButton.styleFrom(
                         backgroundColor: config.color,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        minimumSize: const Size(0, 32),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(6),
                         ),
                       ),
                     ),
@@ -260,4 +370,3 @@ class KpiMainCard extends ConsumerWidget {
     );
   }
 }
-

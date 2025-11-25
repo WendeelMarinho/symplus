@@ -20,7 +20,7 @@ class ApiConfig {
 
     // Se estiver em modo release/produção, usa URL de produção
     if (kReleaseMode) {
-      return 'https://api.symplus.dev';
+      return 'https://srv1113923.hstgr.cloud';
     }
 
     // Detecção automática para desenvolvimento
@@ -57,6 +57,9 @@ class ApiConfig {
   static const String documents = '$apiPrefix/documents';
   static const String reports = '$apiPrefix/reports';
   static const String dashboard = '$apiPrefix/dashboard';
+  static const String dashboardLayout = '$apiPrefix/dashboard/layout';
+  static const String dashboardTemplates = '$apiPrefix/dashboard/templates';
+  static const String dashboardInsights = '$apiPrefix/dashboard/insights';
   static const String subscription = '$apiPrefix/subscription';
   static const String notifications = '$apiPrefix/notifications';
   static const String serviceRequests = '$apiPrefix/service-requests';

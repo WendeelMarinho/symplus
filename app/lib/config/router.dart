@@ -80,7 +80,22 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/login',
         name: 'login',
-        builder: (context, state) => const LoginPage(),
+        builder: (context, state) {
+          // Verificar se foi redirecionado por expiração de token
+          final expired = state.uri.queryParameters['expired'] == '1';
+          if (expired) {
+            // Mostrar toast após um delay para garantir que a página esteja montada
+            Future.microtask(() {
+              if (context.mounted) {
+                ToastService.showWarning(
+                  context,
+                  'Sua sessão expirou. Por favor, faça login novamente.',
+                );
+              }
+            });
+          }
+          return const LoginPage();
+        },
       ),
       // Rotas protegidas dentro do Shell
       GoRoute(

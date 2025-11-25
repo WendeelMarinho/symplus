@@ -105,28 +105,34 @@ class _QuarterlySummaryState extends ConsumerState<QuarterlySummary> {
         // Calcular percentual (margem de lucro)
         final percentage = income > 0 ? (net / income * 100) : 0.0;
 
-        setState(() {
-          _data = QuarterlySummaryData(
-            income: income,
-            expenses: expenses,
-            net: net,
-            percentage: percentage,
-            quarterStart: quarter.start,
-            quarterEnd: quarter.end,
-          );
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _data = QuarterlySummaryData(
+              income: income,
+              expenses: expenses,
+              net: net,
+              percentage: percentage,
+              quarterStart: quarter.start,
+              quarterEnd: quarter.end,
+            );
+            _isLoading = false;
+          });
+        }
       } else {
+        if (mounted) {
+          setState(() {
+            _error = 'Erro ao carregar dados trimestrais';
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
         setState(() {
-          _error = 'Erro ao carregar dados trimestrais';
+          _error = e.toString();
           _isLoading = false;
         });
       }
-    } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
     }
   }
 

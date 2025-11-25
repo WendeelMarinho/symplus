@@ -76,6 +76,10 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
 
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index']);
+    Route::get('/dashboard/layout', [DashboardController::class, 'getLayout']);
+    Route::put('/dashboard/layout', [DashboardController::class, 'saveLayout']);
+    Route::get('/dashboard/templates', [DashboardController::class, 'getTemplates']);
+    Route::get('/dashboard/insights', [DashboardController::class, 'getInsights']);
 
     // Reports
     Route::get('/reports/pl', [ReportController::class, 'pl']);

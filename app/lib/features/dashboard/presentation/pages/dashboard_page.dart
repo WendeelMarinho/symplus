@@ -19,12 +19,20 @@ import '../../../../core/providers/currency_provider.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/l10n/app_localizations.dart';
 import '../../data/models/dashboard_data.dart';
+import '../../data/models/dashboard_layout.dart';
 import '../../data/services/dashboard_service.dart';
+import '../../data/services/dashboard_insights_service.dart';
 import '../widgets/kpi_card.dart';
 import '../widgets/kpi_main_card.dart';
 import '../widgets/quarterly_summary.dart';
 import '../widgets/dashboard_charts.dart';
 import '../widgets/due_items_calendar.dart';
+import '../widgets/draggable_dashboard_item.dart';
+import '../widgets/reorderable_dashboard_grid.dart';
+import '../providers/dashboard_layout_provider.dart';
+import '../providers/dashboard_view_provider.dart';
+import '../widgets/dashboard_view_selector.dart';
+import '../../data/models/dashboard_widget.dart';
 import '../../../custom_indicators/presentation/widgets/custom_indicators_section.dart';
 import '../../../../core/widgets/list_item_card.dart';
 import '../../../../core/widgets/confirm_dialog.dart';
@@ -39,6 +47,7 @@ class DashboardPage extends ConsumerStatefulWidget {
 
 class _DashboardPageState extends ConsumerState<DashboardPage> {
   DashboardData? _data;
+  List<DashboardInsight> _insights = [];
   bool _isLoading = true;
   String? _error;
   final FocusNode _quickActionsFocusNode = FocusNode();
@@ -74,16 +83,20 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
       final periodState = ref.read(periodFilterProvider);
       final dates = periodState.dates;
 
-      // Buscar dados do dashboard com filtro de período
-      final data = await DashboardService.getDashboard(
-        from: dates.from.toIso8601String().split('T')[0],
-        to: dates.to.toIso8601String().split('T')[0],
-      );
+      // Buscar dados do dashboard e insights em paralelo
+      final fromStr = dates.from.toIso8601String().split('T')[0];
+      final toStr = dates.to.toIso8601String().split('T')[0];
+      
+      final results = await Future.wait([
+        DashboardService.getDashboard(from: fromStr, to: toStr),
+        DashboardInsightsService.getInsights(from: fromStr, to: toStr),
+      ]);
       
       if (!mounted) return;
       
       setState(() {
-        _data = data;
+        _data = results[0] as DashboardData;
+        _insights = results[1] as List<DashboardInsight>;
         _isLoading = false;
       });
       TelemetryService.logAction('dashboard.loaded');
@@ -281,6 +294,14 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
       }
     });
 
+    // Observar mudanças na visão do dashboard
+    ref.listen(dashboardViewProvider, (previous, next) {
+      if (previous?.selectedView != next.selectedView && mounted) {
+        // Recarregar dashboard quando a visão mudar
+        setState(() {});
+      }
+    });
+
     return KeyboardListener(
       focusNode: _quickActionsFocusNode,
       onKeyEvent: (event) {
@@ -409,61 +430,11 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                               children: [
                                 RefreshIndicator(
                                   onRefresh: _loadDashboard,
-                                  child: SingleChildScrollView(
-                                    physics: const AlwaysScrollableScrollPhysics(),
-                                    padding: ResponsiveUtils.getResponsivePadding(context),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        // ORDEM ESPECIFICADA:
-                                        // 1. Filtro de Período (global - topo) - já está no PageHeader ✅
-                                        
-                                        // 2. 4 KPIs principais
-                                        _buildKpiCards(),
-                                        SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
-                                        
-                                        // 3. Indicadores Personalizados
-                                        const CustomIndicatorsSection(),
-                                        SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
-                                        
-                                        // 4. Resumo Trimestral
-                                        const QuarterlySummary(),
-                                        SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
-                                        
-                                        // 5. Gráficos (Entrada/Saída por categoria)
-                                        if (canViewTransactions || canViewReports) ...[
-                                          _buildChartsSection(),
-                                          SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
-                                        ],
-                                        
-                                        // 6. Calendário com transações
-                                        if (canViewDueItems) ...[
-                                          _buildDueItemsCalendar(),
-                                          SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
-                                        ],
-                                        
-                                        // 7. Quick Actions (já está na ActionBar acima) ✅
-                                        
-                                        // Seções adicionais (opcionais, mantidas para contexto)
-                                        // Badge de Overdue (alerta importante)
-                                        if (_data!.overdueItems.isNotEmpty) ...[
-                                          _buildOverdueBadge(),
-                                          SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
-                                        ],
-                                        // Transações Recentes (contexto adicional)
-                                        if (canViewTransactions) ...[
-                                          _buildRecentTransactions(),
-                                          SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
-                                        ],
-                                        // Próximos Vencimentos (contexto adicional)
-                                        if (canViewDueItems && _data!.upcomingDueItems.isNotEmpty) ...[
-                                          _buildUpcomingDueItems(canMarkPaid),
-                                          SizedBox(height: ResponsiveUtils.getResponsiveSpacing(context)),
-                                        ],
-                                        // Saldos das Contas (contexto adicional)
-                                        _buildAccountBalances(),
-                                      ],
-                                    ),
+                                  child: _buildReorderableDashboard(
+                                    canViewTransactions: canViewTransactions,
+                                    canViewReports: canViewReports,
+                                    canViewDueItems: canViewDueItems,
+                                    canMarkPaid: canMarkPaid,
                                   ),
                                 ),
                                 // Menu de Quick Actions (modal)
@@ -540,7 +511,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             ],
           ),
           const SizedBox(height: 12),
-          // Linha 2: Título do dashboard
+          // Linha 2: Título do dashboard + Seletor de visão
           Row(
             children: [
               Expanded(
@@ -565,6 +536,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                   ],
                 ),
               ),
+              // Seletor de visão
+              DashboardViewSelector(isMobile: isMobile),
             ],
           ),
         ],
@@ -572,31 +545,135 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     );
   }
 
-  Widget _buildKpiCards() {
+  /// Constrói os widgets do dashboard reordenáveis
+  Widget _buildReorderableDashboard({
+    required bool canViewTransactions,
+    required bool canViewReports,
+    required bool canViewDueItems,
+    required bool canMarkPaid,
+  }) {
+    final viewState = ref.watch(dashboardViewProvider);
     final summary = _data!.financialSummary;
-    final isMobile = ResponsiveUtils.isMobile(context);
     final periodState = ref.watch(periodFilterProvider);
     final dates = periodState.dates;
     
-    // Calcular período anterior (mesma duração, mas antes)
+    // Calcular período anterior
     final periodDuration = dates.to.difference(dates.from).inDays;
     final previousFrom = dates.from.subtract(Duration(days: periodDuration + 1));
     final previousTo = dates.from.subtract(const Duration(days: 1));
     
-    // Calcular valores do período anterior baseado em estimativa
-    // TODO: Quando o backend fornecer dados do período anterior, usar valores reais
-    // Por enquanto, usamos uma estimativa baseada no período atual
     final previousIncome = summary.income * 0.9;
     final previousExpense = summary.expenses * 1.1;
     final previousNet = summary.net * 0.8;
     
-    // Calcular percentual (margem de lucro)
     final percentage = summary.income > 0 
         ? (summary.net / summary.income * 100) 
         : 0.0;
     final previousPercentage = previousIncome > 0 
         ? (previousNet / previousIncome * 100) 
         : 0.0;
+
+    // Construir mapa de widgets disponíveis
+    final widgetMap = <String, Widget>{};
+
+    // KPIs como um grupo arrastável (mantém layout original 2x2)
+    widgetMap['kpi_cards'] = DraggableDashboardItem(
+      widgetId: 'kpi_cards',
+      child: _buildKpiCardsGroup(
+        summary: summary,
+        previousIncome: previousIncome,
+        previousExpense: previousExpense,
+        previousNet: previousNet,
+        percentage: percentage,
+        previousPercentage: previousPercentage,
+      ),
+    );
+
+    // Indicadores Personalizados
+    widgetMap['custom_indicators'] = DraggableDashboardItem(
+      widgetId: 'custom_indicators',
+      child: const CustomIndicatorsSection(),
+    );
+
+    // Resumo Trimestral
+    widgetMap['quarterly_summary'] = DraggableDashboardItem(
+      widgetId: 'quarterly_summary',
+      child: const QuarterlySummary(),
+    );
+
+    // Gráficos
+    if (canViewTransactions || canViewReports) {
+      widgetMap['charts'] = DraggableDashboardItem(
+        widgetId: 'charts',
+        child: _buildChartsSection(),
+      );
+    }
+
+    // Alertas Recentes (unificado: vencidos + próximos vencimentos)
+    if (canViewDueItems && (_data!.overdueItems.isNotEmpty || _data!.upcomingDueItems.isNotEmpty)) {
+      widgetMap['alerts_recent'] = DraggableDashboardItem(
+        widgetId: 'alerts_recent',
+        child: _buildRecentAlerts(canMarkPaid),
+      );
+    }
+
+    // Transações Recentes
+    if (canViewTransactions) {
+      widgetMap['recent_transactions'] = DraggableDashboardItem(
+        widgetId: 'recent_transactions',
+        child: _buildRecentTransactions(),
+      );
+    }
+
+    // Saldos das Contas
+    widgetMap['account_balances'] = DraggableDashboardItem(
+      widgetId: 'account_balances',
+      child: _buildAccountBalances(),
+    );
+
+    // Calendário
+    if (canViewDueItems) {
+      widgetMap['calendar'] = DraggableDashboardItem(
+        widgetId: 'calendar',
+        child: _buildDueItemsCalendar(),
+      );
+    }
+
+    // Usar layout da visão selecionada para filtrar e ordenar widgets
+    final layout = viewState.currentLayout;
+    if (layout != null) {
+      return ReorderableDashboardGrid(
+        widgetMap: widgetMap,
+        layout: layout,
+        onLayoutChanged: (newOrder) {
+          ref.read(dashboardViewProvider.notifier).updateWidgetOrder(newOrder);
+        },
+      );
+    }
+
+    // Fallback: usar ordem padrão se layout não estiver carregado
+    return ReorderableDashboardGrid(widgetMap: widgetMap);
+  }
+
+  /// Busca insight para um widget específico
+  DashboardInsight? _getInsightForWidget(String widgetId) {
+    try {
+      return _insights.firstWhere((insight) => insight.widgetId == widgetId);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Constrói o grupo de KPIs (grid 2x2 no desktop, lista no mobile)
+  Widget _buildKpiCardsGroup({
+    required FinancialSummary summary,
+    required double previousIncome,
+    required double previousExpense,
+    required double previousNet,
+    required double percentage,
+    required double previousPercentage,
+  }) {
+    final isMobile = ResponsiveUtils.isMobile(context);
 
     if (isMobile) {
       // Mobile: cards em lista vertical
@@ -606,60 +683,99 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             type: KpiType.income,
             value: summary.income,
             previousValue: previousIncome,
+            insight: _getInsightForWidget('kpi_income'),
           ),
           const SizedBox(height: 16),
           KpiMainCard(
             type: KpiType.expense,
             value: summary.expenses,
             previousValue: previousExpense,
+            insight: _getInsightForWidget('kpi_expense'),
           ),
           const SizedBox(height: 16),
           KpiMainCard(
             type: KpiType.net,
             value: summary.net,
             previousValue: previousNet,
+            insight: _getInsightForWidget('kpi_net'),
           ),
           const SizedBox(height: 16),
           KpiMainCard(
             type: KpiType.percentage,
             value: percentage,
             previousValue: previousPercentage,
+            insight: _getInsightForWidget('kpi_percentage'),
           ),
         ],
       );
     }
 
-    // Desktop/Tablet: grid 2x2
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      crossAxisSpacing: 16,
-      mainAxisSpacing: 16,
-      childAspectRatio: 1.5,
+    // Desktop/Tablet: grid 2x2 usando Row/Column em vez de GridView para evitar problemas de constraints
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardWidth = (constraints.maxWidth - 16) / 2;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
       children: [
-        KpiMainCard(
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: cardWidth,
+                  child: KpiMainCard(
           type: KpiType.income,
           value: summary.income,
           previousValue: previousIncome,
-        ),
-        KpiMainCard(
+                    insight: _getInsightForWidget('kpi_income'),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                SizedBox(
+                  width: cardWidth,
+                  child: KpiMainCard(
           type: KpiType.expense,
           value: summary.expenses,
           previousValue: previousExpense,
-        ),
-        KpiMainCard(
+                    insight: _getInsightForWidget('kpi_expense'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: cardWidth,
+                  child: KpiMainCard(
           type: KpiType.net,
           value: summary.net,
           previousValue: previousNet,
-        ),
-        KpiMainCard(
+                    insight: _getInsightForWidget('kpi_net'),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                SizedBox(
+                  width: cardWidth,
+                  child: KpiMainCard(
           type: KpiType.percentage,
           value: percentage,
           previousValue: previousPercentage,
-        ),
-      ],
+                    insight: _getInsightForWidget('kpi_percentage'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
     );
+  }
+
+  Widget _buildKpiCards() {
+    // Este método não é mais usado, mas mantido para compatibilidade
+    // A lógica foi movida para _buildReorderableDashboard
+    return const SizedBox.shrink();
   }
 
   Widget _buildPeriodSummary() {
@@ -828,154 +944,11 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   }
 
   Widget _buildChartsSection() {
-    final isMobile = ResponsiveUtils.isMobile(context);
     final periodState = ref.watch(periodFilterProvider);
+    final isMobile = ResponsiveUtils.isMobile(context);
 
-    if (isMobile) {
-      return Column(
-        children: [
           // Bar Chart - Receitas x Despesas
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Receitas x Despesas',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                      ),
-                      Tooltip(
-                        message: 'Período: ${periodState.displayLabel}',
-                        child: Icon(
-                          Icons.info_outline,
-                          size: 18,
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    height: 250,
-                    child: IncomeExpenseBarChart(
-                      data: _data!.monthlyIncomeExpense,
-                      onBarTap: _navigateToTransactionsMonth,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          // Donut Chart - Receitas por Categoria
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Receitas por Categoria',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                      ),
-                      Tooltip(
-                        message: 'Período: ${periodState.displayLabel}',
-                        child: Icon(
-                          Icons.info_outline,
-                          size: 18,
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    height: 250,
-                    child: TopCategoriesDonutChart(
-                      categories: _data!.topCategories.income.take(5).toList(),
-                      onSliceTap: (categoryId) {
-                        final now = DateTime.now();
-                        final start = DateTime(now.year, now.month - 2, 1);
-                        final end = DateTime(now.year, now.month + 1, 0);
-                        final uri = Uri.parse(
-                          '/app/transactions?type=income&categoryId=$categoryId&from=${start.toIso8601String().split('T')[0]}&to=${end.toIso8601String().split('T')[0]}',
-                        );
-                        TelemetryService.logAction('dashboard.chart.donut.income.clicked', metadata: {'category_id': categoryId.toString()});
-                        context.go(uri.toString());
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          // Donut Chart - Despesas por Categoria
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Despesas por Categoria',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                      ),
-                      Tooltip(
-                        message: 'Período: ${periodState.displayLabel}',
-                        child: Icon(
-                          Icons.info_outline,
-                          size: 18,
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    height: 250,
-                    child: TopCategoriesDonutChart(
-                      categories: _data!.topCategories.expenses.take(5).toList(),
-                      onSliceTap: _navigateToTransactionsCategory,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Bar Chart - Receitas x Despesas
-        Expanded(
-          flex: 2,
-          child: Card(
+    final barChart = Card(
             elevation: 3,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
@@ -1025,18 +998,10 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                 ],
               ),
             ),
-          ),
-        ),
-        const SizedBox(width: 16),
-        // Donut Charts - Receitas e Despesas por Categoria
-        Expanded(
-          flex: 1,
-          child: IntrinsicHeight(
-            child: Column(
-              children: [
+    );
+
                 // Donut Chart - Receitas por Categoria
-                Expanded(
-                  child: Card(
+    final incomeDonutChart = Card(
                   elevation: 3,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -1082,12 +1047,10 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                       ],
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 16),
+    );
+
               // Donut Chart - Despesas por Categoria
-              Expanded(
-                child: Card(
+    final expenseDonutChart = Card(
                   elevation: 3,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -1124,13 +1087,72 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                       ],
                     ),
                   ),
-                ),
-              ),
+    );
+
+    if (isMobile) {
+      // Mobile: empilhar verticalmente
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          barChart,
+          const SizedBox(height: 16),
+          incomeDonutChart,
+          const SizedBox(height: 16),
+          expenseDonutChart,
+        ],
+      );
+    }
+
+    // Desktop: usar estrutura que funciona dentro de grid
+    // Usar SizedBox com largura calculada em vez de Flexible para evitar problemas de constraints
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Se não temos constraints válidas ou estamos em um grid pequeno, retornar versão mobile
+        if (constraints.maxWidth == double.infinity || 
+            constraints.maxWidth == 0 || 
+            constraints.maxWidth < 800) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              barChart,
+              const SizedBox(height: 16),
+              incomeDonutChart,
+              const SizedBox(height: 16),
+              expenseDonutChart,
             ],
+          );
+        }
+        
+        // Para desktop com largura suficiente, usar Row com SizedBox calculado
+        // Isso evita problemas de constraints não limitadas
+        final spacing = 16.0;
+        final totalWidth = constraints.maxWidth;
+        final barChartWidth = (totalWidth - spacing) * 2 / 3; // 2/3 da largura
+        final donutChartWidth = (totalWidth - spacing) / 3; // 1/3 da largura
+        
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: barChartWidth,
+              child: barChart,
             ),
-          ),
-        ),
-      ],
+            SizedBox(width: spacing),
+            SizedBox(
+              width: donutChartWidth,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  incomeDonutChart,
+                  const SizedBox(height: 16),
+                  expenseDonutChart,
+                ],
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -1395,59 +1417,178 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     );
   }
 
-  Widget _buildOverdueBadge() {
+  /// Widget unificado de alertas recentes (vencidos + próximos vencimentos)
+  Widget _buildRecentAlerts(bool canMarkPaid) {
     final currencyState = ref.watch(currencyProvider);
-    final count = _data!.overdueItems.length;
-    final total = _data!.overdueItems.fold<double>(
+    final overdueCount = _data!.overdueItems.length;
+    final overdueTotal = _data!.overdueItems.fold<double>(
+      0.0,
+      (sum, item) => sum + item.amount,
+    );
+    final upcomingCount = _data!.upcomingDueItems.length;
+    final upcomingTotal = _data!.upcomingDueItems.fold<double>(
       0.0,
       (sum, item) => sum + item.amount,
     );
 
-    return Container(
+    return Card(
+      elevation: 2,
+      child: Padding(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.red.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red.shade300, width: 2),
-      ),
-      child: InkWell(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.notifications_active,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Alertas Recentes',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                  ],
+                ),
+                TextButton.icon(
+                  onPressed: () {
+                    TelemetryService.logAction('dashboard.alerts.view_all.clicked');
+                    context.go('/app/due-items');
+                  },
+                  icon: const Icon(Icons.arrow_forward, size: 16),
+                  label: const Text('Ver tudo'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Itens Vencidos
+            if (overdueCount > 0) ...[
+              InkWell(
         onTap: () {
-          TelemetryService.logAction('dashboard.overdue_badge.clicked');
+                  TelemetryService.logAction('dashboard.alerts.overdue.clicked');
           context.go('/app/due-items?status=overdue');
         },
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red.shade300, width: 1),
+                  ),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: Colors.red,
-                borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.warning, color: Colors.white),
+                        child: const Icon(Icons.warning, color: Colors.white, size: 20),
             ),
-            const SizedBox(width: 16),
+                      const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '$count ${count == 1 ? 'item vencido' : 'itens vencidos'}',
+                              '$overdueCount ${overdueCount == 1 ? 'item vencido' : 'itens vencidos'}',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: Colors.red.shade900,
                         ),
                   ),
-                  const SizedBox(height: 4),
+                            const SizedBox(height: 2),
                   Text(
-                    'Total: ${_formatCurrency(total, currencyState)}',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              'Total: ${_formatCurrency(overdueTotal, currencyState)}',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Colors.red.shade700,
                         ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward, color: Colors.red),
+                      const Icon(Icons.chevron_right, color: Colors.red),
+                    ],
+                  ),
+                ),
+              ),
+              if (upcomingCount > 0) const SizedBox(height: 12),
+            ],
+            // Próximos Vencimentos
+            if (upcomingCount > 0) ...[
+              InkWell(
+                onTap: () {
+                  final today = DateTime.now();
+                  final nextWeek = today.add(const Duration(days: 7));
+                  TelemetryService.logAction('dashboard.alerts.upcoming.clicked');
+                  context.go(
+                    '/app/due-items?from=${today.toIso8601String().split('T')[0]}&to=${nextWeek.toIso8601String().split('T')[0]}',
+                  );
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.shade300, width: 1),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.orange,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.schedule, color: Colors.white, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '$upcomingCount ${upcomingCount == 1 ? 'próximo vencimento' : 'próximos vencimentos'}',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.orange.shade900,
+                                  ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Total: ${_formatCurrency(upcomingTotal, currencyState)}',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Colors.orange.shade700,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right, color: Colors.orange),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+            // Link para notificações
+            const SizedBox(height: 12),
+            TextButton.icon(
+              onPressed: () {
+                TelemetryService.logAction('dashboard.alerts.notifications.clicked');
+                context.go('/app/notifications');
+              },
+              icon: const Icon(Icons.notifications, size: 18),
+              label: const Text('Ver todas as notificações'),
+            ),
           ],
         ),
       ),

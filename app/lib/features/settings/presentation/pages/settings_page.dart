@@ -55,7 +55,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   ) async {
     try {
       final result = await FilePicker.platform.pickFiles(
-        type: FileType.image,
+        type: FileType.custom,
         allowMultiple: false,
         allowedExtensions: ['png', 'jpg', 'jpeg', 'webp'],
       );

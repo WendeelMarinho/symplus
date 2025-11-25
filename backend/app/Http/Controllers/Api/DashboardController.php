@@ -364,4 +364,196 @@ class DashboardController extends Controller
             'projection_period_days' => 30,
         ];
     }
+
+    /**
+     * Get dashboard layout for user/organization.
+     * 
+     * Query parameters:
+     * - view: Dashboard view (cash, result, collection)
+     */
+    public function getLayout(Request $request): JsonResponse
+    {
+        $organizationId = $request->header('X-Organization-Id');
+        $userId = $request->user()->id;
+        $view = $request->input('view', 'cash');
+
+        // TODO: Implementar busca no banco de dados quando migration estiver criada
+        // Por enquanto, retorna 404 para usar template padrão no frontend
+        return response()->json(['message' => 'Layout not found'], 404);
+    }
+
+    /**
+     * Save dashboard layout for user/organization.
+     */
+    public function saveLayout(Request $request): JsonResponse
+    {
+        $organizationId = $request->header('X-Organization-Id');
+        $userId = $request->user()->id;
+        
+        $validated = $request->validate([
+            'view' => 'required|string|in:cash,result,collection',
+            'widgets' => 'required|array',
+            'widgets.*.id' => 'required|string',
+            'widgets.*.type' => 'required|string',
+        ]);
+
+        // TODO: Implementar salvamento no banco de dados quando migration estiver criada
+        // Por enquanto, retorna sucesso simulado
+        return response()->json([
+            'data' => [
+                'id' => uniqid('layout_'),
+                'view' => $validated['view'],
+                'widgets' => $validated['widgets'],
+                'is_template' => false,
+                'updated_at' => now()->toIso8601String(),
+            ]
+        ], 201);
+    }
+
+    /**
+     * Get available dashboard templates.
+     */
+    public function getTemplates(Request $request): JsonResponse
+    {
+        $templates = [
+            [
+                'view' => 'cash',
+                'is_template' => true,
+                'widgets' => [
+                    ['id' => 'kpi_cards', 'type' => 'kpi', 'default_span' => 12, 'default_order' => 1, 'visible' => true],
+                    ['id' => 'account_balances', 'type' => 'account', 'default_span' => 6, 'default_order' => 2, 'visible' => true],
+                    ['id' => 'cash_flow_chart', 'type' => 'chart', 'default_span' => 6, 'default_order' => 3, 'visible' => true],
+                    ['id' => 'alerts_recent', 'type' => 'alert', 'default_span' => 12, 'default_order' => 4, 'visible' => true],
+                    ['id' => 'calendar', 'type' => 'calendar', 'default_span' => 12, 'default_order' => 5, 'visible' => true],
+                ],
+            ],
+            [
+                'view' => 'result',
+                'is_template' => true,
+                'widgets' => [
+                    ['id' => 'kpi_cards', 'type' => 'kpi', 'default_span' => 12, 'default_order' => 1, 'visible' => true],
+                    ['id' => 'custom_indicators', 'type' => 'indicator', 'default_span' => 12, 'default_order' => 2, 'visible' => true],
+                    ['id' => 'charts_pl', 'type' => 'chart', 'default_span' => 6, 'default_order' => 3, 'visible' => true],
+                    ['id' => 'charts_categories', 'type' => 'chart', 'default_span' => 6, 'default_order' => 4, 'visible' => true],
+                    ['id' => 'quarterly_summary', 'type' => 'summary', 'default_span' => 12, 'default_order' => 5, 'visible' => true],
+                ],
+            ],
+            [
+                'view' => 'collection',
+                'is_template' => true,
+                'widgets' => [
+                    ['id' => 'kpi_collection', 'type' => 'kpi', 'default_span' => 12, 'default_order' => 1, 'visible' => true],
+                    ['id' => 'alerts_recent', 'type' => 'alert', 'default_span' => 12, 'default_order' => 2, 'visible' => true],
+                    ['id' => 'calendar', 'type' => 'calendar', 'default_span' => 12, 'default_order' => 3, 'visible' => true],
+                ],
+            ],
+        ];
+
+        return response()->json(['data' => $templates]);
+    }
+
+    /**
+     * Get dashboard insights.
+     * 
+     * Query parameters:
+     * - from: Start date (Y-m-d format, optional)
+     * - to: End date (Y-m-d format, optional)
+     */
+    public function getInsights(Request $request): JsonResponse
+    {
+        $organizationId = $request->header('X-Organization-Id');
+        $organization = Organization::findOrFail($organizationId);
+
+        $from = $request->input('from') 
+            ? \Carbon\Carbon::parse($request->input('from'))->startOfDay()
+            : now()->startOfMonth();
+        $to = $request->input('to')
+            ? \Carbon\Carbon::parse($request->input('to'))->endOfDay()
+            : now()->endOfMonth();
+
+        $insights = [];
+
+        // Calcular período anterior para comparação
+        $periodDuration = $to->diffInDays($from);
+        $previousFrom = $from->copy()->subDays($periodDuration + 1);
+        $previousTo = $from->copy()->subDay();
+
+        // Obter dados financeiros
+        $currentSummary = $this->getFinancialSummary($organizationId, $from, $to);
+        $previousSummary = $this->getFinancialSummary($organizationId, $previousFrom, $previousTo);
+
+        // Insight para Entrada
+        if ($previousSummary['income'] > 0) {
+            $incomeChange = (($currentSummary['income'] - $previousSummary['income']) / $previousSummary['income']) * 100;
+            if (abs($incomeChange) > 5) {
+                $insights[] = [
+                    'widget_id' => 'kpi_income',
+                    'type' => $incomeChange > 0 ? 'success' : 'warning',
+                    'message' => $incomeChange > 0
+                        ? "Suas entradas aumentaram " . number_format(abs($incomeChange), 1) . "% em relação ao período anterior."
+                        : "Suas entradas diminuíram " . number_format(abs($incomeChange), 1) . "% em relação ao período anterior.",
+                    'icon' => $incomeChange > 0 ? 'trending_up' : 'trending_down',
+                ];
+            }
+        }
+
+        // Insight para Saída
+        if ($previousSummary['expenses'] > 0) {
+            $expenseChange = (($currentSummary['expenses'] - $previousSummary['expenses']) / $previousSummary['expenses']) * 100;
+            if (abs($expenseChange) > 5) {
+                $insights[] = [
+                    'widget_id' => 'kpi_expense',
+                    'type' => $expenseChange < 0 ? 'success' : 'warning',
+                    'message' => $expenseChange < 0
+                        ? "Suas despesas diminuíram " . number_format(abs($expenseChange), 1) . "% em relação ao período anterior."
+                        : "Suas despesas aumentaram " . number_format(abs($expenseChange), 1) . "% em relação ao período anterior.",
+                    'icon' => $expenseChange < 0 ? 'trending_down' : 'trending_up',
+                ];
+            }
+        }
+
+        // Insight para Resultado
+        if ($currentSummary['net'] < 0) {
+            $insights[] = [
+                'widget_id' => 'kpi_net',
+                'type' => 'error',
+                'message' => "Você está com saldo negativo de " . number_format(abs($currentSummary['net']), 2, ',', '.') . ".",
+                'icon' => 'warning',
+            ];
+        } elseif ($previousSummary['net'] < 0 && $currentSummary['net'] >= 0) {
+            $insights[] = [
+                'widget_id' => 'kpi_net',
+                'type' => 'success',
+                'message' => "Parabéns! Você saiu do vermelho e agora está com saldo positivo.",
+                'icon' => 'check_circle',
+            ];
+        }
+
+        // Insight para Percentual
+        $currentPercentage = $currentSummary['income'] > 0 
+            ? ($currentSummary['net'] / $currentSummary['income']) * 100 
+            : 0;
+        if ($currentPercentage < 0) {
+            $insights[] = [
+                'widget_id' => 'kpi_percentage',
+                'type' => 'warning',
+                'message' => "Sua margem está negativa. Considere revisar suas despesas.",
+                'icon' => 'info',
+            ];
+        }
+
+        // Verificar itens vencidos
+        $overdueItems = $this->getOverdueItems($organizationId);
+        if (count($overdueItems) > 0) {
+            $totalOverdue = array_sum(array_column($overdueItems, 'amount'));
+            $insights[] = [
+                'widget_id' => 'alerts_recent',
+                'type' => 'error',
+                'message' => "Você tem " . count($overdueItems) . " item(s) vencido(s) totalizando " . number_format($totalOverdue, 2, ',', '.') . ".",
+                'icon' => 'error',
+            ];
+        }
+
+        return response()->json(['data' => $insights]);
+    }
 }

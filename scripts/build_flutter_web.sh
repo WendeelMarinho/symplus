@@ -36,10 +36,13 @@ echo "3️⃣  Fazendo build de produção..."
 # Build com API_BASE_URL para produção
 # Usando --dart-define para garantir que a URL correta seja usada
 # Nota: --web-renderer foi removido nas versões mais recentes do Flutter
+# Build com API_BASE_URL para produção
+# URL da VPS: https://srv1113923.hstgr.cloud
 flutter build web \
     --release \
     --dart-define=API_BASE_URL=https://srv1113923.hstgr.cloud \
-    --base-href=/app/
+    --base-href=/app/ \
+    --web-renderer canvaskit
 echo ""
 
 echo "4️⃣  Copiando arquivos para diretório de deploy..."

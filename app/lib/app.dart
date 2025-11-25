@@ -6,6 +6,9 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'config/router.dart';
 import 'core/l10n/app_localizations.dart';
 import 'core/providers/locale_provider.dart';
+import 'core/auth/auth_session_handler.dart';
+import 'core/auth/auth_provider.dart';
+import 'core/widgets/toast_service.dart';
 
 class SymplusApp extends ConsumerWidget {
   const SymplusApp({super.key});
@@ -14,6 +17,17 @@ class SymplusApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
     final localeState = ref.watch(localeProvider);
+
+    // Configurar handler de sessão para tratar 401
+    AuthSessionHandler.configure(
+      onTokenExpired: () async {
+        // Resetar auth provider
+        ref.read(authProvider.notifier).logout();
+        
+        // Redirecionar para login com parâmetro indicando expiração
+        router.go('/login?expired=1');
+      },
+    );
 
     return MaterialApp.router(
       title: 'Symplus Finance',

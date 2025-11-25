@@ -45,6 +45,42 @@ class StorageService {
     return await _storage.read(key: 'user_id');
   }
 
+  // Role storage
+  static Future<void> saveRole(String role) async {
+    await _storage.write(key: 'user_role', value: role);
+  }
+
+  static Future<String?> getRole() async {
+    return await _storage.read(key: 'user_role');
+  }
+
+  // Email storage
+  static Future<void> saveEmail(String email) async {
+    await _storage.write(key: 'user_email', value: email);
+  }
+
+  static Future<String?> getEmail() async {
+    return await _storage.read(key: 'user_email');
+  }
+
+  // Name storage
+  static Future<void> saveName(String name) async {
+    await _storage.write(key: 'user_name', value: name);
+  }
+
+  static Future<String?> getName() async {
+    return await _storage.read(key: 'user_name');
+  }
+
+  // Organization name storage
+  static Future<void> saveOrganizationName(String organizationName) async {
+    await _storage.write(key: 'organization_name', value: organizationName);
+  }
+
+  static Future<String?> getOrganizationName() async {
+    return await _storage.read(key: 'organization_name');
+  }
+
   // Clear all storage
   static Future<void> clearAll() async {
     await _storage.deleteAll();

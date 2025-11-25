@@ -129,36 +129,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                 label: Text(item.label),
               );
             }).toList(),
-            trailing: Expanded(
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 16.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Avatar no NavigationRail
-                      Consumer(
-                        builder: (context, ref, child) {
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 16.0),
-                            child: UserAvatar(
-                              radius: 24,
-                              onTap: () => context.go('/app/profile'),
-                            ),
-                          );
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.logout),
-                        onPressed: () => _handleLogout(context),
-                        tooltip: 'Sair',
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+            // Removido trailing para evitar overflow - avatar e logout estão no AppBar
           ),
           const VerticalDivider(thickness: 1, width: 1),
           Expanded(
@@ -297,6 +268,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     return AppBar(
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(currentItem?.label ?? 'Symplus Finance'),
           if (!isWide && authState.organizationName != null)
@@ -617,4 +589,3 @@ class _AppShellState extends ConsumerState<AppShell> {
     );
   }
 }
-

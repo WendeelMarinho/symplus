@@ -44,6 +44,9 @@ dependencies:
   
   # Charts
   fl_chart: ^0.66.0
+  
+  # Drag & Drop
+  reorderable_grid_view: ^2.0.6
 
 dev_dependencies:
   flutter_test:
